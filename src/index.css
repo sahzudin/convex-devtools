@@ -1,0 +1,188 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3a3a3a;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4a4a4a;
+}
+
+/* Monaco editor customizations */
+.monaco-editor {
+  border-radius: 8px;
+}
+
+/* JSON syntax highlighting in response panel */
+.json-key {
+  color: #9cdcfe;
+}
+
+.json-string {
+  color: #ce9178;
+}
+
+.json-number {
+  color: #b5cea8;
+}
+
+.json-boolean {
+  color: #569cd6;
+}
+
+.json-null {
+  color: #569cd6;
+}
+
+/* Light theme overrides when `.light` is present on the document element */
+.light body {
+  background: #f8fafc;
+  color: #1e293b;
+}
+.light .bg-convex-dark {
+  background-color: #ffffff !important;
+}
+.light .bg-convex-darker {
+  background-color: #f1f5f9 !important;
+}
+.light .border-convex-border {
+  border-color: #cbd5e1 !important;
+}
+.light .text-gray-300 {
+  color: #334155 !important;
+}
+.light .text-gray-400 {
+  color: #475569 !important;
+}
+.light .text-gray-500 {
+  color: #64748b !important;
+}
+.light .text-gray-600 {
+  color: #475569 !important;
+}
+.light .text-white {
+  color: #0f172a !important;
+}
+.light .bg-convex-accent {
+  background-color: #f97316 !important;
+}
+.light .bg-convex-border {
+  background-color: #e2e8f0 !important;
+}
+.light .hover\:bg-convex-border:hover {
+  background-color: #e2e8f0 !important;
+}
+.light textarea,
+.light input {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #1e293b !important;
+}
+.light pre {
+  color: #334155 !important;
+}
+.light .json-key {
+  color: #0369a1 !important;
+}
+.light .json-string {
+  color: #b45309 !important;
+}
+.light .json-number {
+  color: #047857 !important;
+}
+.light .json-boolean {
+  color: #7c3aed !important;
+}
+.light .json-null {
+  color: #6b7280 !important;
+}
+
+/* Light theme scrollbar */
+.light ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+.light ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Light theme info boxes and banners */
+.light .bg-blue-900\/20 {
+  background-color: #dbeafe !important;
+}
+.light .text-blue-300 {
+  color: #1d4ed8 !important;
+}
+.light .bg-gray-800\/50 {
+  background-color: #e2e8f0 !important;
+}
+.light .bg-green-900\/20 {
+  background-color: #dcfce7 !important;
+}
+.light .text-green-300 {
+  color: #15803d !important;
+}
+.light .text-green-400 {
+  color: #16a34a !important;
+}
+
+/* Light theme Q/M/A badges */
+.light .bg-blue-900\/30 {
+  background-color: #dbeafe !important;
+}
+.light .text-blue-400 {
+  color: #2563eb !important;
+}
+.light .bg-orange-900\/30 {
+  background-color: #ffedd5 !important;
+}
+.light .text-orange-400 {
+  color: #ea580c !important;
+}
+.light .bg-purple-900\/30 {
+  background-color: #f3e8ff !important;
+}
+.light .text-purple-400 {
+  color: #9333ea !important;
+}
+
+/* Light theme code blocks */
+.light code {
+  background-color: #e2e8f0 !important;
+  color: #1e293b !important;
+}
