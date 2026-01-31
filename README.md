@@ -275,6 +275,10 @@ npm publish
 npm publish --access public
 ```
 
+> Note: If your npm account requires 2FA for publishing, you can either enable it with
+> `npm profile enable-2fa auth-only` (then publish with your OTP), or use a granular
+> access token with “bypass 2FA for publish” enabled.
+
 ### Testing Before Publishing
 
 ```bash
@@ -328,9 +332,29 @@ Use the `--port` flag to specify a different port:
 convex-devtools --port 3001
 ```
 
+### "command not found: convex-devtools" after global install
+
+If you installed globally but the command isn't found, npm's global bin directory may not be in your PATH.
+
+1. Find your npm global bin path:
+   ```bash
+   npm config get prefix
+   ```
+
+2. Add the bin folder to your PATH. For example, on macOS/Linux with zsh:
+   ```bash
+   echo 'export PATH="$(npm config get prefix)/bin:$PATH"' >> ~/.zshrc
+   source ~/.zshrc
+   ```
+
+3. Alternatively, use `npx` which doesn't require PATH setup:
+   ```bash
+   npx convex-devtools
+   ```
+
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) before submitting a Pull Request.
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
@@ -340,7 +364,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-MIT © [Šahzudin Mahmić]
+MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Related Projects
 
