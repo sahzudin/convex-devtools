@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { SchemaInfo, ModuleInfo, FunctionInfo } from '../stores/schema-store';
 
 interface FunctionTreeProps {
@@ -16,6 +16,49 @@ export function FunctionTree({
     new Set()
   );
   const [searchQuery, setSearchQuery] = useState('');
+  const treeContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-expand modules when a function is selected
+  useEffect(() => {
+    if (selectedFunction) {
+      // Function path format is "module/path:functionName", e.g., "users/api:getUser"
+      // We need to extract the module path (before the colon) and expand all parent modules
+      const colonIndex = selectedFunction.path.lastIndexOf(':');
+      const modulePath =
+        colonIndex > -1
+          ? selectedFunction.path.substring(0, colonIndex)
+          : selectedFunction.path;
+
+      const pathParts = modulePath.split('/');
+      const modulesToExpand: string[] = [];
+
+      // Build all parent module paths (e.g., for "users/api" -> ["users", "users/api"])
+      for (let i = 0; i < pathParts.length; i++) {
+        modulesToExpand.push(pathParts.slice(0, i + 1).join('/'));
+      }
+
+      if (modulesToExpand.length > 0) {
+        setExpandedModules((prev) => {
+          const next = new Set(prev);
+          modulesToExpand.forEach((path) => next.add(path));
+          return next;
+        });
+      }
+
+      // Scroll to selected function after modules are expanded
+      setTimeout(() => {
+        const selectedButton = treeContainerRef.current?.querySelector(
+          `[data-function-path="${selectedFunction.path}"]`
+        );
+        if (selectedButton) {
+          selectedButton.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest',
+          });
+        }
+      }, 100);
+    }
+  }, [selectedFunction]);
 
   const toggleModule = (path: string) => {
     setExpandedModules((prev) => {
@@ -121,6 +164,8 @@ export function FunctionTree({
     return (
       <button
         key={func.path}
+        data-function-path={func.path}
+        data-selected={isSelected}
         onClick={() => onSelectFunction(func)}
         className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors ${
           isSelected
@@ -146,8 +191,8 @@ export function FunctionTree({
   return (
     <div className='flex flex-col h-full'>
       {/* Search */}
-      <div className='p-3 border-b border-convex-border'>
-        <div className='relative'>
+      <div className='px-3 h-14 border-b border-convex-border flex items-center'>
+        <div className='relative w-full'>
           <svg
             className='absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500'
             fill='none'
@@ -166,13 +211,13 @@ export function FunctionTree({
             placeholder='Search functions...'
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className='w-full bg-convex-darker border border-convex-border rounded-lg pl-10 pr-3 py-2 text-sm focus:outline-none focus:border-convex-accent'
+            className='w-full bg-convex-darker border border-convex-border rounded-lg pl-10 pr-3 py-1.5 text-sm focus:outline-none focus:border-convex-accent'
           />
         </div>
       </div>
 
       {/* Tree */}
-      <div className='flex-1 overflow-auto py-2'>
+      <div ref={treeContainerRef} className='flex-1 overflow-auto py-2'>
         {!schema ? (
           <div className='flex items-center justify-center h-32 text-gray-500 text-sm'>
             Loading schema...

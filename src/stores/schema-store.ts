@@ -12,6 +12,8 @@ export interface ArgInfo {
   name: string;
   type: string;
   optional: boolean;
+  description?: string;
+  enumValues?: string[];
 }
 
 export interface ModuleInfo {

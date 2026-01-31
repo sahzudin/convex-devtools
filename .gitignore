@@ -35,6 +35,9 @@ coverage/
 .turbo/
 .cache/
 
+# Local devtools data
+.convex-devtools/
+
 # npm
 *.tgz
 package-lock.json

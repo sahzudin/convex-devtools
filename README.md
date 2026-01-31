@@ -63,6 +63,12 @@ convex-devtools --dir /path/to/your/project
 # Run on a custom port
 convex-devtools --port 3000
 
+# Share collections across all projects on this machine
+convex-devtools --storage global
+
+# Use a custom shared database path
+convex-devtools --storage path --storage-path /path/to/devtools.sqlite
+
 # Don't auto-open browser
 convex-devtools --no-open
 ```
@@ -71,13 +77,23 @@ The tool will automatically open in your browser at `http://localhost:5173`.
 
 ## CLI Options
 
-| Option                | Description                      | Default |
-| --------------------- | -------------------------------- | ------- |
-| `-p, --port <number>` | Port for the devtools server     | `5173`  |
-| `-d, --dir <path>`    | Path to Convex project directory | `.`     |
-| `--no-open`           | Don't open browser automatically | -       |
-| `-V, --version`       | Display version number           | -       |
-| `-h, --help`          | Display help information         | -       |
+| Option                  | Description                                      | Default   |
+| ----------------------- | ------------------------------------------------ | --------- |
+| `-p, --port <number>`   | Port for the devtools server                     | `5173`    |
+| `-d, --dir <path>`      | Path to Convex project directory                 | `.`       |
+| `--storage <mode>`      | Storage scope: `project`, `global`, or `path`    | `project` |
+| `--storage-path <path>` | Custom storage path (only with `--storage path`) | -         |
+| `--no-open`             | Don't open browser automatically                 | -         |
+| `-V, --version`         | Display version number                           | -         |
+| `-h, --help`            | Display help information                         | -         |
+
+## Storage Options
+
+By default, collections and history are stored per project directory, so multiple ports running against different projects won’t share data.
+
+- **project** (default): data stored under `<project>/.convex-devtools/devtools.sqlite`.
+- **global**: shared data stored under `~/.convex-devtools/devtools.sqlite`.
+- **path**: store data at a custom SQLite path you provide.
 
 ## Identity Mocking
 
@@ -210,15 +226,15 @@ convex-devtools/
 
 ### Scripts
 
-| Script          | Description                         |
-| --------------- | ----------------------------------- |
-| `pnpm dev`      | Start development server            |
-| `pnpm build`    | Build the frontend                  |
-| `pnpm build:cli`| Build the CLI                       |
-| `pnpm build:all`| Build everything for production     |
-| `pnpm typecheck`| Run TypeScript type checking        |
-| `pnpm lint`     | Run ESLint                          |
-| `pnpm preview`  | Preview production build locally    |
+| Script           | Description                      |
+| ---------------- | -------------------------------- |
+| `pnpm dev`       | Start development server         |
+| `pnpm build`     | Build the frontend               |
+| `pnpm build:cli` | Build the CLI                    |
+| `pnpm build:all` | Build everything for production  |
+| `pnpm typecheck` | Run TypeScript type checking     |
+| `pnpm lint`      | Run ESLint                       |
+| `pnpm preview`   | Preview production build locally |
 
 ## Publishing to npm
 
@@ -227,6 +243,7 @@ convex-devtools/
 1. Create an npm account at [npmjs.com](https://www.npmjs.com/signup)
 
 2. Login to npm from your terminal:
+
    ```bash
    npm login
    ```
@@ -306,6 +323,7 @@ You need to set `CONVEX_DEPLOY_KEY` in your `.env.local` file. Get your deploy k
 ### Port already in use
 
 Use the `--port` flag to specify a different port:
+
 ```bash
 convex-devtools --port 3001
 ```
@@ -322,7 +340,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-MIT © [Your Name]
+MIT © [Šahzudin Mahmić]
 
 ## Related Projects
 

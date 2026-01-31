@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useRequestStore } from '../stores/request-store';
+import { usePersistenceStore } from '../stores/persistence-store';
 
 interface AuthPanelProps {
   onClose: () => void;
@@ -7,6 +8,7 @@ interface AuthPanelProps {
 
 export function AuthPanel({ onClose }: AuthPanelProps) {
   const { jwtToken, setJwtToken } = useRequestStore();
+  const { setSavedToken } = usePersistenceStore();
   const [tokenInput, setTokenInput] = useState(jwtToken);
   const [decodedPayload, setDecodedPayload] = useState<Record<
     string,
@@ -48,12 +50,15 @@ export function AuthPanel({ onClose }: AuthPanelProps) {
   };
 
   const applyToken = () => {
-    setJwtToken(tokenInput.trim());
+    const trimmedToken = tokenInput.trim();
+    setJwtToken(trimmedToken);
+    setSavedToken(trimmedToken); // Persist token to localStorage
   };
 
   const clearToken = () => {
     setTokenInput('');
     setJwtToken('');
+    setSavedToken(''); // Clear persisted token
     setDecodedPayload(null);
     setDecodeError(null);
   };

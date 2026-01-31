@@ -20,8 +20,16 @@ export interface Collection {
   createdAt: string;
 }
 
+export interface Subfolder {
+  id: string;
+  name: string;
+  parentId: string | null; // null means root level
+  createdAt: string;
+}
+
 export interface HistoryEntry {
   id: string;
+  projectName?: string;
   functionPath: string;
   functionType: 'query' | 'mutation' | 'action';
   args: string;
@@ -36,15 +44,24 @@ export interface ExportData {
 }
 
 const STORAGE_KEY = 'convex-devtools-data';
+const TOKEN_STORAGE_KEY = 'convex-devtools-jwt-token';
 
 interface PersistenceState {
   collections: Collection[];
+  subfolders: Subfolder[];
   history: HistoryEntry[];
+  savedToken: string;
 
   // Collection actions
   createCollection: (name: string, folder?: string | null) => string;
   deleteCollection: (id: string) => void;
   renameCollection: (id: string, name: string) => void;
+  moveCollection: (id: string, newFolder: string | null) => void;
+
+  // Subfolder actions
+  createSubfolder: (name: string, parentId?: string | null) => string;
+  deleteSubfolder: (id: string) => void;
+  renameSubfolder: (id: string, name: string) => void;
 
   // Request actions
   saveRequest: (
@@ -63,6 +80,15 @@ interface PersistenceState {
     requestId: string,
     updates: Partial<SavedRequest>
   ) => void;
+  renameRequest: (
+    collectionId: string,
+    requestId: string,
+    name: string
+  ) => void;
+
+  // Token persistence
+  setSavedToken: (token: string) => void;
+  loadSavedToken: () => string;
 
   // History actions
   addToHistory: (entry: Omit<HistoryEntry, 'id'>) => void;
@@ -70,8 +96,8 @@ interface PersistenceState {
   clearHistory: () => void;
 
   // Persistence actions
-  loadFromStorage: () => void;
-  saveToStorage: () => void;
+  loadFromStorage: () => Promise<void>;
+  saveToStorage: () => Promise<void>;
 
   // Import/Export
   exportData: () => ExportData;
@@ -80,7 +106,9 @@ interface PersistenceState {
 
 export const usePersistenceStore = create<PersistenceState>((set, get) => ({
   collections: [],
+  subfolders: [],
   history: [],
+  savedToken: '',
 
   createCollection: (name, folder) => {
     const id = nanoid();
@@ -96,7 +124,7 @@ export const usePersistenceStore = create<PersistenceState>((set, get) => ({
       collections: [...state.collections, collection],
     }));
 
-    get().saveToStorage();
+    void get().saveToStorage();
     return id;
   },
 
@@ -104,7 +132,7 @@ export const usePersistenceStore = create<PersistenceState>((set, get) => ({
     set((state) => ({
       collections: state.collections.filter((c) => c.id !== id),
     }));
-    get().saveToStorage();
+    void get().saveToStorage();
   },
 
   renameCollection: (id, name) => {
@@ -113,7 +141,56 @@ export const usePersistenceStore = create<PersistenceState>((set, get) => ({
         c.id === id ? { ...c, name } : c
       ),
     }));
-    get().saveToStorage();
+    void get().saveToStorage();
+  },
+
+  moveCollection: (id, newFolder) => {
+    set((state) => ({
+      collections: state.collections.map((c) =>
+        c.id === id ? { ...c, folder: newFolder } : c
+      ),
+    }));
+    void get().saveToStorage();
+  },
+
+  createSubfolder: (name, parentId) => {
+    const id = nanoid();
+    const subfolder: Subfolder = {
+      id,
+      name,
+      parentId: parentId ?? null,
+      createdAt: new Date().toISOString(),
+    };
+
+    set((state) => ({
+      subfolders: [...state.subfolders, subfolder],
+    }));
+
+    void get().saveToStorage();
+    return id;
+  },
+
+  deleteSubfolder: (id) => {
+    set((state) => {
+      // Also move collections in this subfolder to root
+      const updatedCollections = state.collections.map((c) =>
+        c.folder === id ? { ...c, folder: null } : c
+      );
+      return {
+        subfolders: state.subfolders.filter((s) => s.id !== id),
+        collections: updatedCollections,
+      };
+    });
+    void get().saveToStorage();
+  },
+
+  renameSubfolder: (id, name) => {
+    set((state) => ({
+      subfolders: state.subfolders.map((s) =>
+        s.id === id ? { ...s, name } : s
+      ),
+    }));
+    void get().saveToStorage();
   },
 
   // Save request with an optional response (useful for saving request+response snapshots)
@@ -134,7 +211,7 @@ export const usePersistenceStore = create<PersistenceState>((set, get) => ({
           : c
       ),
     }));
-    get().saveToStorage();
+    void get().saveToStorage();
   },
 
   deleteRequest: (collectionId, requestId) => {
@@ -145,7 +222,7 @@ export const usePersistenceStore = create<PersistenceState>((set, get) => ({
           : c
       ),
     }));
-    get().saveToStorage();
+    void get().saveToStorage();
   },
 
   updateRequest: (collectionId, requestId, updates) => {
@@ -161,7 +238,47 @@ export const usePersistenceStore = create<PersistenceState>((set, get) => ({
           : c
       ),
     }));
-    get().saveToStorage();
+    void get().saveToStorage();
+  },
+
+  renameRequest: (collectionId, requestId, name) => {
+    set((state) => ({
+      collections: state.collections.map((c) =>
+        c.id === collectionId
+          ? {
+              ...c,
+              requests: c.requests.map((r) =>
+                r.id === requestId ? { ...r, name } : r
+              ),
+            }
+          : c
+      ),
+    }));
+    void get().saveToStorage();
+  },
+
+  setSavedToken: (token) => {
+    set({ savedToken: token });
+    try {
+      if (token) {
+        localStorage.setItem(TOKEN_STORAGE_KEY, token);
+      } else {
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+      }
+    } catch (err) {
+      console.error('Failed to save token to localStorage:', err);
+    }
+  },
+
+  loadSavedToken: () => {
+    try {
+      const token = localStorage.getItem(TOKEN_STORAGE_KEY) || '';
+      set({ savedToken: token });
+      return token;
+    } catch (err) {
+      console.error('Failed to load token from localStorage:', err);
+      return '';
+    }
   },
 
   addToHistory: (entry) => {
@@ -174,45 +291,75 @@ export const usePersistenceStore = create<PersistenceState>((set, get) => ({
       // Keep last 100 history entries
       history: [historyEntry, ...state.history].slice(0, 100),
     }));
-    get().saveToStorage();
+    void get().saveToStorage();
   },
 
   deleteHistoryEntry: (id) => {
     set((state) => ({
       history: state.history.filter((h) => h.id !== id),
     }));
-    get().saveToStorage();
+    void get().saveToStorage();
   },
 
   clearHistory: () => {
     set({ history: [] });
-    get().saveToStorage();
+    void get().saveToStorage();
   },
 
-  loadFromStorage: () => {
+  loadFromStorage: async () => {
+    try {
+      const response = await fetch('/api/persistence');
+      if (response.ok) {
+        const data = await response.json();
+        set({
+          collections: Array.isArray(data.collections) ? data.collections : [],
+          subfolders: Array.isArray(data.subfolders) ? data.subfolders : [],
+          history: Array.isArray(data.history) ? data.history : [],
+        });
+        return;
+      }
+    } catch (err) {
+      console.error('Failed to load from server storage:', err);
+    }
+
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const data = JSON.parse(stored);
         set({
           collections: data.collections || [],
+          subfolders: data.subfolders || [],
           history: data.history || [],
         });
       }
     } catch (err) {
-      console.error('Failed to load from storage:', err);
+      console.error('Failed to load from local storage:', err);
     }
   },
 
-  saveToStorage: () => {
+  saveToStorage: async () => {
     try {
-      const { collections, history } = get();
+      const { collections, subfolders, history } = get();
+      const response = await fetch('/api/persistence', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ collections, subfolders, history }),
+      });
+      if (response.ok) {
+        return;
+      }
+    } catch (err) {
+      console.error('Failed to save to server storage:', err);
+    }
+
+    try {
+      const { collections, subfolders, history } = get();
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ collections, history })
+        JSON.stringify({ collections, subfolders, history })
       );
     } catch (err) {
-      console.error('Failed to save to storage:', err);
+      console.error('Failed to save to local storage:', err);
     }
   },
 
@@ -241,6 +388,6 @@ export const usePersistenceStore = create<PersistenceState>((set, get) => ({
         collections: [...state.collections, ...newCollections],
       };
     });
-    get().saveToStorage();
+    void get().saveToStorage();
   },
 }));

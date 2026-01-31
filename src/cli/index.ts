@@ -5,6 +5,7 @@ import { Command } from 'commander';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import open from 'open';
+import os from 'os';
 import path from 'path';
 import { createServer } from '../server/index.js';
 import { SchemaWatcher } from '../server/schema-watcher.js';
@@ -19,6 +20,15 @@ program
 program
   .option('-p, --port <number>', 'Port for the devtools server', '5173')
   .option('-d, --dir <path>', 'Path to Convex project directory', '.')
+  .option(
+    '--storage <mode>',
+    'Storage scope: project (default), global, or path',
+    'project'
+  )
+  .option(
+    '--storage-path <path>',
+    'Custom storage path when using --storage path'
+  )
   .option('--no-open', 'Do not open browser automatically')
   .action(async (options) => {
     const projectDir = path.resolve(options.dir);
@@ -96,6 +106,36 @@ program
     console.log(chalk.green('✓') + ` Project: ${chalk.dim(projectDir)}`);
     console.log();
 
+    const storageMode = String(options.storage || 'project');
+    let persistencePath: string | undefined;
+
+    if (storageMode === 'project') {
+      persistencePath = path.join(
+        projectDir,
+        '.convex-devtools',
+        'devtools.sqlite'
+      );
+    } else if (storageMode === 'global') {
+      persistencePath = path.join(
+        os.homedir(),
+        '.convex-devtools',
+        'devtools.sqlite'
+      );
+    } else if (storageMode === 'path') {
+      if (!options.storagePath) {
+        console.error(
+          chalk.red('✗ --storage path requires --storage-path <path>')
+        );
+        process.exit(1);
+      }
+      persistencePath = path.resolve(String(options.storagePath));
+    } else {
+      console.error(
+        chalk.red('✗ Invalid --storage value. Use project, global, or path.')
+      );
+      process.exit(1);
+    }
+
     // Start schema watcher
     const schemaWatcher = new SchemaWatcher(projectDir);
     await schemaWatcher.start();
@@ -108,6 +148,7 @@ program
       convexUrl,
       deployKey,
       schemaWatcher,
+      persistencePath,
     });
 
     console.log(

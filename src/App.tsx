@@ -12,18 +12,60 @@ function App() {
   const [showAuthPanel, setShowAuthPanel] = useState(false);
   const [showCollections, setShowCollections] = useState(true);
   const [convexUrl, setConvexUrl] = useState<string>('');
-  const [theme, setTheme] = useState<string>(() =>
-    typeof window !== 'undefined'
-      ? localStorage.getItem('theme') || 'dark'
-      : 'dark'
-  );
+  const [projectName, setProjectName] = useState<string>('');
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('theme') as
+        | 'light'
+        | 'dark'
+        | 'system'
+        | null;
+      return stored || 'system';
+    }
+    return 'system';
+  });
   const { connect, isConnected, schema, error } = useSchemaStore();
-  const { selectedFunction, setSelectedFunction, jwtToken } = useRequestStore();
-  const { loadFromStorage } = usePersistenceStore();
+  const {
+    selectedFunction,
+    setSelectedFunction,
+    jwtToken,
+    setJwtToken,
+    setProjectName: setProjectNameInStore,
+    recentTabs,
+    removeFromRecentTabs,
+  } = useRequestStore();
+  const { loadFromStorage, loadSavedToken } = usePersistenceStore();
+
+  // Compute the actual theme based on system preference
+  const [systemPrefersDark, setSystemPrefersDark] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return true;
+  });
+
+  // Listen for system theme changes
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      setSystemPrefersDark(e.matches);
+    };
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  // Compute actual theme
+  const actualTheme =
+    theme === 'system' ? (systemPrefersDark ? 'dark' : 'light') : theme;
 
   useEffect(() => {
     connect();
-    loadFromStorage();
+    void loadFromStorage();
+    // Load saved JWT token
+    const savedToken = loadSavedToken();
+    if (savedToken && !jwtToken) {
+      setJwtToken(savedToken);
+    }
     // Fetch the convex URL from the health endpoint
     fetch('/api/health')
       .then((res) => res.json())
@@ -31,12 +73,36 @@ function App() {
         if (data.convexUrl) {
           setConvexUrl(data.convexUrl);
         }
+        if (data.projectName) {
+          setProjectName(data.projectName);
+          setProjectNameInStore(data.projectName);
+        }
       })
       .catch(() => {});
-  }, [connect, loadFromStorage]);
+  }, [connect, loadFromStorage, loadSavedToken, setJwtToken, jwtToken]);
+
+  // Reload persistence when window regains focus to sync across instances
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('[DevTools] Tab visible, reloading persistence...');
+        void loadFromStorage();
+      }
+    };
+    const handleFocus = () => {
+      console.log('[DevTools] Window focused, reloading persistence...');
+      void loadFromStorage();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [loadFromStorage]);
 
   useEffect(() => {
-    if (theme === 'light') {
+    if (actualTheme === 'light') {
       document.documentElement.classList.add('light');
     } else {
       document.documentElement.classList.remove('light');
@@ -44,7 +110,7 @@ function App() {
     try {
       localStorage.setItem('theme', theme);
     } catch {}
-  }, [theme]);
+  }, [actualTheme, theme]);
 
   // Extract deployment name from convexUrl (e.g. "https://festive-dotterel-544.convex.cloud" -> "festive-dotterel-544")
   const deploymentName = convexUrl
@@ -75,6 +141,7 @@ function App() {
             >
               <circle cx='12' cy='12' r='10' strokeWidth='2' />
             </svg>
+            {projectName ? `${projectName} • ` : ''}
             {envLabel} • {deploymentName || 'loading...'}
           </span>
         </div>
@@ -98,11 +165,39 @@ function App() {
           )}
 
           <button
-            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+            onClick={() => {
+              // Cycle through: system -> light -> dark -> system
+              if (theme === 'system') setTheme('light');
+              else if (theme === 'light') setTheme('dark');
+              else setTheme('system');
+            }}
             className='p-2 rounded hover:bg-convex-border transition-colors text-gray-400'
-            title='Toggle theme'
+            title={`Theme: ${theme} (click to change)`}
           >
-            {theme === 'light' ? (
+            {theme === 'system' ? (
+              // Computer/monitor icon for system theme
+              <svg
+                className='w-5 h-5'
+                viewBox='0 0 24 24'
+                fill='none'
+                stroke='currentColor'
+              >
+                <rect
+                  x='2'
+                  y='3'
+                  width='20'
+                  height='14'
+                  rx='2'
+                  strokeWidth={2}
+                />
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth={2}
+                  d='M8 21h8M12 17v4'
+                />
+              </svg>
+            ) : actualTheme === 'light' ? (
               <svg
                 className='w-5 h-5'
                 viewBox='0 0 24 24'
@@ -204,6 +299,66 @@ function App() {
 
         {/* Main Area */}
         <div className='flex-1 flex flex-col min-w-0'>
+          {/* Recent Tabs Bar */}
+          {recentTabs.length > 0 && (
+            <div className='flex items-center gap-1 px-2 py-1 bg-convex-darker border-b border-convex-border overflow-x-auto flex-shrink-0'>
+              {recentTabs.map((tab) => {
+                const isActive = selectedFunction?.path === tab.path;
+                const typeColor =
+                  tab.type === 'query'
+                    ? 'text-blue-400'
+                    : tab.type === 'mutation'
+                      ? 'text-orange-400'
+                      : 'text-purple-400';
+                return (
+                  <div
+                    key={tab.path}
+                    className={`flex items-center gap-1 pl-2 pr-1 py-0.5 rounded text-xs font-mono transition-colors ${
+                      isActive
+                        ? 'bg-gray-300 dark:bg-convex-border text-gray-900 dark:text-white'
+                        : 'hover:bg-gray-200 dark:hover:bg-convex-border/50 text-gray-600 dark:text-gray-400'
+                    }`}
+                    title={tab.path}
+                  >
+                    <button
+                      onClick={() => setSelectedFunction(tab)}
+                      className='flex items-center gap-1 truncate max-w-[150px]'
+                    >
+                      <span
+                        className={`font-semibold flex-shrink-0 ${typeColor}`}
+                      >
+                        {tab.type.charAt(0).toUpperCase()}
+                      </span>
+                      <span className='truncate'>{tab.name}</span>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeFromRecentTabs(tab.path);
+                      }}
+                      className='p-0.5 rounded hover:bg-convex-dark text-gray-500 hover:text-white transition-colors flex-shrink-0'
+                      title='Close tab'
+                    >
+                      <svg
+                        className='w-3 h-3'
+                        fill='none'
+                        stroke='currentColor'
+                        viewBox='0 0 24 24'
+                      >
+                        <path
+                          strokeLinecap='round'
+                          strokeLinejoin='round'
+                          strokeWidth={2}
+                          d='M6 18L18 6M6 6l12 12'
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {/* Request Panel */}
           <div className='h-1/2 border-b border-convex-border overflow-auto'>
             <RequestPanel />

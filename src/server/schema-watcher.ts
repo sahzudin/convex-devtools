@@ -15,6 +15,8 @@ export interface ArgInfo {
   name: string;
   type: string;
   optional: boolean;
+  description?: string;
+  enumValues?: string[];
 }
 
 export interface ModuleInfo {
@@ -253,8 +255,15 @@ export class SchemaWatcher extends EventEmitter {
             | 'action';
         }
 
+        // Extract JSDoc comment above the function
+        const jsdocComment = this.extractJSDocAbove(content, match.index);
+
         // Extract args from the function definition
-        const args = this.extractArgsFromPosition(content, match.index);
+        const args = this.extractArgsFromPosition(
+          content,
+          match.index,
+          jsdocComment
+        );
 
         functions.push({
           name: funcName,
@@ -270,15 +279,64 @@ export class SchemaWatcher extends EventEmitter {
     return functions;
   }
 
+  private extractJSDocAbove(content: string, position: number): string {
+    // Look backwards from position to find JSDoc comment
+    // Allow some whitespace and newlines between the JSDoc and the export
+    const beforePosition = content.slice(0, position);
+    // Match JSDoc that ends with */ followed by optional whitespace before the export
+    const jsdocMatch = beforePosition.match(/\/\*\*([\s\S]*?)\*\/\s*$/);
+    if (jsdocMatch) {
+      return jsdocMatch[1];
+    }
+
+    // Also try to find JSDoc within the last 500 chars (in case there's space between)
+    const last500 = beforePosition.slice(-500);
+    const jsdocMatch2 = last500.match(/\/\*\*([\s\S]*?)\*\//);
+    return jsdocMatch2 ? jsdocMatch2[1] : '';
+  }
+
+  private parseJSDocParams(
+    jsdoc: string
+  ): Map<string, { description: string; enumValues?: string[] }> {
+    const params = new Map<
+      string,
+      { description: string; enumValues?: string[] }
+    >();
+
+    // Match @param patterns like: @param sortBy - Sort order: 'newest', 'oldest'
+    const paramPattern = /@param\s+(\w+)\s*-?\s*([^@]*)/g;
+    let match;
+    while ((match = paramPattern.exec(jsdoc)) !== null) {
+      const [, paramName, description] = match;
+      const trimmedDesc = description.trim();
+
+      // Extract enum values from description (quoted strings like 'value1', 'value2')
+      const enumMatches = trimmedDesc.match(/'([^']+)'/g);
+      const enumValues = enumMatches
+        ? enumMatches.map((e) => e.replace(/'/g, ''))
+        : undefined;
+
+      params.set(paramName, {
+        description: trimmedDesc,
+        enumValues:
+          enumValues && enumValues.length > 0 ? enumValues : undefined,
+      });
+    }
+
+    return params;
+  }
+
   private extractArgsFromPosition(
     content: string,
-    startIndex: number
+    startIndex: number,
+    jsdocComment: string = ''
   ): ArgInfo[] {
     const args: ArgInfo[] = [];
+    const jsdocParams = this.parseJSDocParams(jsdocComment);
 
     // Find the args: { ... } section
     const afterStart = content.slice(startIndex);
-    const argsMatch = afterStart.match(/args:\s*\{([^}]*)\}/);
+    const argsMatch = afterStart.match(/args:\s*\{([^}]*)\}/s);
 
     if (argsMatch) {
       const argsContent = argsMatch[1];
@@ -290,13 +348,28 @@ export class SchemaWatcher extends EventEmitter {
       let argMatch;
       while ((argMatch = argPattern.exec(argsContent)) !== null) {
         const [, argName, isOptional, argType] = argMatch;
+        const jsdocInfo = jsdocParams.get(argName);
 
         args.push({
           name: argName,
           type: argType,
           optional: !!isOptional,
+          description: jsdocInfo?.description,
+          enumValues: jsdocInfo?.enumValues,
         });
       }
+    }
+
+    // Check for paginationOpts (built-in Convex pagination)
+    const hasPaginationOpts = afterStart.match(/paginationOptsValidator/s);
+    if (hasPaginationOpts) {
+      // Add paginationOpts as a synthetic argument
+      args.push({
+        name: 'paginationOpts',
+        type: 'PaginationOptions',
+        optional: false,
+        description: 'Pagination options with cursor and numItems',
+      });
     }
 
     return args;

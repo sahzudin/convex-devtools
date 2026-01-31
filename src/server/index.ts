@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { WebSocket, WebSocketServer } from 'ws';
 import { ConvexClient } from './convex-client.js';
+import { PersistenceDb } from './persistence-db.js';
 import { SchemaWatcher } from './schema-watcher.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -15,6 +16,7 @@ export interface ServerConfig {
   convexUrl: string;
   deployKey: string;
   schemaWatcher: SchemaWatcher;
+  persistencePath?: string;
 }
 
 export async function createServer(config: ServerConfig): Promise<http.Server> {
@@ -29,6 +31,12 @@ export async function createServer(config: ServerConfig): Promise<http.Server> {
 
   // Create Convex client
   const convexClient = new ConvexClient(config.convexUrl, config.deployKey);
+
+  // Shared persistence database (collections/history)
+  const persistenceDb = await PersistenceDb.create(
+    config.persistencePath ??
+      path.join(config.projectDir, '.convex-devtools', 'devtools.sqlite')
+  );
 
   // API Routes
   app.get('/api/schema', (_req, res) => {
@@ -45,7 +53,21 @@ export async function createServer(config: ServerConfig): Promise<http.Server> {
       status: 'ok',
       convexUrl: config.convexUrl,
       projectDir: config.projectDir,
+      projectName: path.basename(config.projectDir),
     });
+  });
+
+  app.get('/api/persistence', (_req, res) => {
+    res.json(persistenceDb.getData());
+  });
+
+  app.put('/api/persistence', (req, res) => {
+    const { collections, history } = req.body || {};
+    persistenceDb.setData({
+      collections: Array.isArray(collections) ? collections : [],
+      history: Array.isArray(history) ? history : [],
+    });
+    res.json({ success: true });
   });
 
   // Invoke a function

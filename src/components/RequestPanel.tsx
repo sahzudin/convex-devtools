@@ -8,6 +8,7 @@ export function RequestPanel() {
     args,
     jwtToken,
     isLoading,
+    projectName,
     setArgs,
     invoke,
     isArgsValid,
@@ -35,6 +36,7 @@ export function RequestPanel() {
     const { response } = useRequestStore.getState();
     if (selectedFunction && response) {
       addToHistory({
+        projectName: projectName || undefined,
         functionPath: selectedFunction.path,
         functionType: selectedFunction.type,
         args,
@@ -42,6 +44,14 @@ export function RequestPanel() {
         timestamp: new Date().toISOString(),
       });
     }
+  };
+
+  const handleOpenSaveModal = () => {
+    // Set default name to full function path
+    if (selectedFunction) {
+      setSaveName(selectedFunction.path);
+    }
+    setShowSaveModal(true);
   };
 
   const handleSave = () => {
@@ -98,21 +108,63 @@ export function RequestPanel() {
 
   return (
     <div className='flex flex-col h-full'>
-      {/* Header */}
-      <div className='flex items-center justify-between p-4 border-b border-convex-border'>
-        <div className='flex items-center gap-3'>
+      {/* Header - Compact */}
+      <div className='flex items-center justify-between px-3 py-2 border-b border-convex-border'>
+        <div className='flex items-center gap-2 min-w-0'>
           <span
-            className={`text-xs font-mono font-semibold px-2 py-1 border rounded ${typeColors[selectedFunction.type]}`}
+            className={`text-[10px] font-mono font-semibold px-1.5 py-0.5 border rounded flex-shrink-0 ${typeColors[selectedFunction.type]}`}
           >
-            {selectedFunction.type.toUpperCase()}
+            {selectedFunction.type.charAt(0).toUpperCase()}
           </span>
-          <span className='font-mono text-sm'>{selectedFunction.path}</span>
+          <span className='font-mono text-sm truncate'>
+            {selectedFunction.path}
+          </span>
+          {/* JWT Auth Status Icon */}
+          {jwtToken ? (
+            <span
+              className='flex-shrink-0 text-green-400 cursor-help'
+              title='Authenticated with JWT token'
+            >
+              <svg
+                className='w-4 h-4'
+                fill='none'
+                stroke='currentColor'
+                viewBox='0 0 24 24'
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth={2}
+                  d='M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'
+                />
+              </svg>
+            </span>
+          ) : (
+            <span
+              className='flex-shrink-0 text-gray-500 cursor-help'
+              title='No authentication - Click key icon in header to add JWT'
+            >
+              <svg
+                className='w-4 h-4'
+                fill='none'
+                stroke='currentColor'
+                viewBox='0 0 24 24'
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth={2}
+                  d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'
+                />
+              </svg>
+            </span>
+          )}
         </div>
 
-        <div className='flex items-center gap-2'>
+        <div className='flex items-center gap-2 flex-shrink-0'>
           <button
-            onClick={() => setShowSaveModal(true)}
-            className='px-3 py-1.5 text-sm text-gray-400 hover:text-white hover:bg-convex-border rounded transition-colors'
+            onClick={handleOpenSaveModal}
+            className='p-1.5 text-gray-400 hover:text-white hover:bg-convex-border rounded transition-colors'
             title='Save to Collection'
           >
             <svg
@@ -125,7 +177,7 @@ export function RequestPanel() {
                 strokeLinecap='round'
                 strokeLinejoin='round'
                 strokeWidth={2}
-                d='M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4'
+                d='M8 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7.828a2 2 0 00-.586-1.414l-1.828-1.828A2 2 0 0016.172 4H16M8 4v4m0-4h4m0 0v4m0-4h4v4M8 8h8M8 12h8m-8 4h6'
               />
             </svg>
           </button>
@@ -133,52 +185,37 @@ export function RequestPanel() {
           <button
             onClick={handleInvoke}
             disabled={isLoading || !isArgsValid}
-            className={`px-4 py-1.5 rounded font-medium transition-colors flex items-center gap-2 ${
+            className={`px-3 py-1 rounded font-medium text-sm transition-colors flex items-center gap-1.5 min-w-[70px] justify-center ${
               isLoading
                 ? 'bg-gray-600 cursor-not-allowed'
                 : 'bg-convex-accent hover:bg-convex-accent-hover'
             }`}
           >
             {isLoading ? (
-              <>
-                <svg className='animate-spin w-4 h-4' viewBox='0 0 24 24'>
-                  <circle
-                    className='opacity-25'
-                    cx='12'
-                    cy='12'
-                    r='10'
-                    stroke='currentColor'
-                    strokeWidth='4'
-                    fill='none'
-                  />
-                  <path
-                    className='opacity-75'
-                    fill='currentColor'
-                    d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
-                  />
-                </svg>
-                Running...
-              </>
+              <svg className='animate-spin w-3.5 h-3.5' viewBox='0 0 24 24'>
+                <circle
+                  className='opacity-25'
+                  cx='12'
+                  cy='12'
+                  r='10'
+                  stroke='currentColor'
+                  strokeWidth='4'
+                  fill='none'
+                />
+                <path
+                  className='opacity-75'
+                  fill='currentColor'
+                  d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                />
+              </svg>
             ) : (
               <>
                 <svg
-                  className='w-4 h-4'
-                  fill='none'
-                  stroke='currentColor'
+                  className='w-3.5 h-3.5'
+                  fill='currentColor'
                   viewBox='0 0 24 24'
                 >
-                  <path
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                    strokeWidth={2}
-                    d='M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z'
-                  />
-                  <path
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                    strokeWidth={2}
-                    d='M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
-                  />
+                  <path d='M8 5v14l11-7z' />
                 </svg>
                 Run
               </>
@@ -187,99 +224,207 @@ export function RequestPanel() {
         </div>
       </div>
 
-      {/* Auth Status Banner */}
-      {jwtToken ? (
-        <div className='px-4 py-2 bg-green-900/20 border-b border-convex-border'>
-          <div className='flex items-center gap-2 text-sm'>
-            <svg
-              className='w-4 h-4 text-green-400'
-              fill='none'
-              stroke='currentColor'
-              viewBox='0 0 24 24'
-            >
-              <path
-                strokeLinecap='round'
-                strokeLinejoin='round'
-                strokeWidth={2}
-                d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
-              />
-            </svg>
-            <span className='text-green-300'>Authenticated with JWT token</span>
-          </div>
-        </div>
-      ) : (
-        <div className='px-4 py-2 bg-gray-800/50 border-b border-convex-border'>
-          <div className='flex items-center gap-2 text-sm'>
-            <svg
-              className='w-4 h-4 text-gray-500'
-              fill='none'
-              stroke='currentColor'
-              viewBox='0 0 24 24'
-            >
-              <path
-                strokeLinecap='round'
-                strokeLinejoin='round'
-                strokeWidth={2}
-                d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'
-              />
-            </svg>
-            <span className='text-gray-400'>
-              No authentication — Click{' '}
-              <svg
-                className='w-4 h-4 inline-block text-yellow-500'
-                fill='none'
-                stroke='currentColor'
-                viewBox='0 0 24 24'
+      {/* Main Content Area with Args Editor and Arguments Panel */}
+      <div className='flex-1 flex overflow-hidden'>
+        {/* Args Editor */}
+        <div className='flex-1 flex flex-col p-4'>
+          <div className='flex items-center justify-between mb-2'>
+            <label className='text-sm text-gray-400'>Arguments (JSON)</label>
+            <div className='flex items-center gap-3'>
+              <button
+                onClick={formatJson}
+                className='text-xs text-gray-500 hover:text-white transition-colors'
               >
-                <path
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                  strokeWidth={2}
-                  d='M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z'
-                />
-              </svg>{' '}
-              in header to add JWT token
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Args Editor */}
-      <div className='flex-1 flex flex-col p-4'>
-        <div className='flex items-center justify-between mb-2'>
-          <label className='text-sm text-gray-400'>Arguments (JSON)</label>
-          <div className='flex items-center gap-3'>
-            <button
-              onClick={formatJson}
-              className='text-xs text-gray-500 hover:text-white transition-colors'
-            >
-              Format
-            </button>
-            <div className='text-xs'>
-              {isArgsValid ? (
-                <span className='text-green-400'>✓ Valid JSON</span>
-              ) : (
-                <span className='text-red-400' title={argsError || ''}>
-                  ✗ Invalid JSON
-                </span>
-              )}
+                Format
+              </button>
+              <div className='text-xs'>
+                {isArgsValid ? (
+                  <span className='text-green-600 dark:text-green-400'>
+                    ✓ Valid JSON
+                  </span>
+                ) : (
+                  <span
+                    className='text-red-600 dark:text-red-400'
+                    title={argsError || ''}
+                  >
+                    ✗ Invalid JSON
+                  </span>
+                )}
+              </div>
             </div>
           </div>
+          <textarea
+            ref={textareaRef}
+            value={args}
+            onChange={(e) => setArgs(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                handleInvoke();
+              }
+            }}
+            className='flex-1 w-full bg-convex-darker border border-convex-border rounded-lg p-4 font-mono text-sm resize-none focus:outline-none focus:border-convex-accent'
+            placeholder='{}'
+            spellCheck={false}
+          />
+          <p className='mt-2 text-xs text-gray-500'>Press ⌘+Enter to run</p>
         </div>
-        <textarea
-          ref={textareaRef}
-          value={args}
-          onChange={(e) => setArgs(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-              handleInvoke();
-            }
-          }}
-          className='flex-1 w-full bg-convex-darker border border-convex-border rounded-lg p-4 font-mono text-sm resize-none focus:outline-none focus:border-convex-accent'
-          placeholder='{}'
-          spellCheck={false}
-        />
-        <p className='mt-2 text-xs text-gray-500'>Press ⌘+Enter to run</p>
+
+        {/* Arguments Panel */}
+        {selectedFunction && selectedFunction.args.length > 0 && (
+          <div className='w-64 border-l border-convex-border flex flex-col overflow-hidden'>
+            <div className='p-3 border-b border-convex-border'>
+              <h3 className='text-sm font-semibold text-gray-300'>Arguments</h3>
+            </div>
+            <div className='flex-1 overflow-y-auto p-3 space-y-2'>
+              {selectedFunction.args.map((arg) => {
+                const currentArgs = (() => {
+                  try {
+                    return JSON.parse(args);
+                  } catch {
+                    return {};
+                  }
+                })();
+                const isInArgs = arg.name in currentArgs;
+
+                const handleToggleArg = () => {
+                  try {
+                    const parsed = JSON.parse(args);
+                    if (isInArgs) {
+                      // Remove the argument
+                      delete parsed[arg.name];
+                    } else {
+                      // Add the argument with default value
+                      if (arg.name === 'paginationOpts') {
+                        parsed[arg.name] = { cursor: null, numItems: 10 };
+                      } else if (
+                        arg.type.includes('[]') ||
+                        arg.type.toLowerCase().includes('array')
+                      ) {
+                        parsed[arg.name] = [];
+                      } else if (arg.type.toLowerCase().includes('number')) {
+                        parsed[arg.name] = 0;
+                      } else if (arg.type.toLowerCase().includes('boolean')) {
+                        parsed[arg.name] = false;
+                      } else {
+                        parsed[arg.name] = '';
+                      }
+                    }
+                    setArgs(JSON.stringify(parsed, null, 2));
+                  } catch {
+                    // If JSON is invalid, don't do anything
+                  }
+                };
+
+                return (
+                  <div
+                    key={arg.name}
+                    className={`p-2 rounded border ${
+                      isInArgs
+                        ? 'bg-convex-accent/10 border-convex-accent/50'
+                        : 'bg-convex-darker border-convex-border'
+                    } transition-colors`}
+                  >
+                    <div className='flex items-start justify-between gap-2'>
+                      <div className='flex-1 min-w-0'>
+                        <div className='flex items-center gap-1.5'>
+                          <span className='text-sm font-mono text-gray-300 truncate'>
+                            {arg.name}
+                          </span>
+                          {!arg.optional && (
+                            <span className='text-xs text-red-400'>*</span>
+                          )}
+                        </div>
+                        <div className='text-xs text-gray-500 mt-0.5 truncate'>
+                          {arg.type}
+                        </div>
+                        {arg.description && (
+                          <div
+                            className='text-xs text-gray-400 mt-1'
+                            title={arg.description}
+                          >
+                            {arg.description.length > 60
+                              ? arg.description.substring(0, 60) + '...'
+                              : arg.description}
+                          </div>
+                        )}
+                        {arg.enumValues && arg.enumValues.length > 0 && (
+                          <div className='flex flex-wrap gap-1 mt-1.5'>
+                            {arg.enumValues.map((value) => (
+                              <span
+                                key={value}
+                                onClick={() => {
+                                  try {
+                                    const parsed = JSON.parse(args);
+                                    parsed[arg.name] = value;
+                                    setArgs(JSON.stringify(parsed, null, 2));
+                                  } catch {
+                                    // ignore
+                                  }
+                                }}
+                                className='text-[10px] px-1.5 py-0.5 rounded bg-convex-border text-gray-300 hover:bg-convex-accent/30 cursor-pointer transition-colors'
+                                title={`Click to set ${arg.name} to '${value}'`}
+                              >
+                                {value}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        onClick={handleToggleArg}
+                        disabled={!arg.optional && isInArgs}
+                        className={`flex-shrink-0 p-1 rounded transition-colors ${
+                          !arg.optional && isInArgs
+                            ? 'text-gray-600 cursor-not-allowed'
+                            : isInArgs
+                              ? 'text-red-400 hover:text-red-300 hover:bg-red-400/10'
+                              : 'text-green-400 hover:text-green-300 hover:bg-green-400/10'
+                        }`}
+                        title={
+                          !arg.optional && isInArgs
+                            ? 'Required argument'
+                            : isInArgs
+                              ? 'Remove from request'
+                              : 'Add to request'
+                        }
+                      >
+                        {isInArgs ? (
+                          <svg
+                            className='w-4 h-4'
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'
+                          >
+                            <path
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                              strokeWidth={2}
+                              d='M20 12H4'
+                            />
+                          </svg>
+                        ) : (
+                          <svg
+                            className='w-4 h-4'
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'
+                          >
+                            <path
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                              strokeWidth={2}
+                              d='M12 4v16m8-8H4'
+                            />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Save Modal */}

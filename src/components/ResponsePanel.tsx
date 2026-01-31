@@ -100,15 +100,23 @@ export function ResponsePanel() {
     }
   };
 
+  // Check if the response indicates an error - either from response.success or from result.status
+  const isError =
+    !response.success ||
+    (response.success &&
+      response.result &&
+      typeof response.result === 'object' &&
+      (response.result as Record<string, unknown>)?.status === 'error');
+
   return (
     <div className='flex flex-col h-full'>
-      {/* Header */}
-      <div className='flex items-center justify-between p-4 border-b border-convex-border'>
-        <div className='flex items-center gap-3'>
-          {response.success ? (
-            <span className='flex items-center gap-2 text-green-400'>
+      {/* Header - Compact */}
+      <div className='flex items-center justify-between px-3 py-1.5 border-b border-convex-border'>
+        <div className='flex items-center gap-2'>
+          {!isError ? (
+            <span className='flex items-center gap-1.5 text-green-400 text-sm'>
               <svg
-                className='w-5 h-5'
+                className='w-4 h-4'
                 fill='none'
                 stroke='currentColor'
                 viewBox='0 0 24 24'
@@ -123,9 +131,9 @@ export function ResponsePanel() {
               Success
             </span>
           ) : (
-            <span className='flex items-center gap-2 text-red-400'>
+            <span className='flex items-center gap-1.5 text-red-400 text-sm'>
               <svg
-                className='w-5 h-5'
+                className='w-4 h-4'
                 fill='none'
                 stroke='currentColor'
                 viewBox='0 0 24 24'
@@ -145,7 +153,7 @@ export function ResponsePanel() {
             <span className='text-sm text-gray-500'>{response.duration}ms</span>
           )}
 
-          <span className='text-xs text-gray-600'>
+          <span className='text-sm text-gray-600'>
             {new Date(response.timestamp).toLocaleTimeString()}
           </span>
         </div>
@@ -154,7 +162,7 @@ export function ResponsePanel() {
           {/* Search inline */}
           <div className='relative'>
             <svg
-              className='absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-500'
+              className='absolute left-2 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-500'
               fill='none'
               stroke='currentColor'
               viewBox='0 0 24 24'
@@ -227,11 +235,11 @@ export function ResponsePanel() {
                   />
                 </svg>
                 <div>
-                  <p className='text-red-300 font-medium'>
+                  <p className='text-red-700 dark:text-red-300 font-medium'>
                     {response.error?.message}
                   </p>
                   {response.error?.code && (
-                    <p className='text-red-400 text-sm mt-1'>
+                    <p className='text-red-600 dark:text-red-400 text-sm mt-1'>
                       Code: {response.error.code}
                     </p>
                   )}
