@@ -8,7 +8,7 @@
 
 A standalone development tool for testing Convex queries, mutations, and actions with identity mocking, request saving, and auto-reloading schema discovery.
 
-> ⚠️ **WARNING**: This tool is intended for **local development only**. It requires admin access to your Convex deployment.
+> 💡 **Note**: This tool is designed for **development and testing**. A deploy key is optional but enables identity mocking features.
 
 ## Features
 
@@ -337,11 +337,13 @@ convex-devtools --port 3001
 If you installed globally but the command isn't found, npm's global bin directory may not be in your PATH.
 
 1. Find your npm global bin path:
+
    ```bash
    npm config get prefix
    ```
 
 2. Add the bin folder to your PATH. For example, on macOS/Linux with zsh:
+
    ```bash
    echo 'export PATH="$(npm config get prefix)/bin:$PATH"' >> ~/.zshrc
    source ~/.zshrc
