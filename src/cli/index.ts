@@ -15,7 +15,7 @@ const program = new Command();
 program
   .name('convex-devtools')
   .description('A standalone development tool for testing Convex functions')
-  .version('0.1.0');
+  .version('1.0.0');
 
 program
   .option('-p, --port <number>', 'Port for the devtools server', '5173')
@@ -96,7 +96,7 @@ program
     console.log(chalk.cyan('╔══════════════════════════════════════════╗'));
     console.log(
       chalk.cyan('║') +
-        chalk.white.bold('         Convex DevTools v0.1.0           ') +
+        chalk.white.bold('         Convex DevTools v1.0.0           ') +
         chalk.cyan('║')
     );
     console.log(chalk.cyan('╚══════════════════════════════════════════╝'));
