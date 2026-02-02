@@ -48,7 +48,7 @@ export class ConvexClient {
     // Build headers
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Convex-Client': 'convex-devtools-1.0.0',
+      'Convex-Client': 'convex-devtools-1.0.1',
     };
 
     // Authentication priority:

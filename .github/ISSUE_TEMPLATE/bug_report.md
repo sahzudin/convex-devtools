@@ -32,7 +32,7 @@ If applicable, add screenshots to help explain the problem.
 
 - **OS**: [e.g., macOS 14.0, Windows 11, Ubuntu 22.04]
 - **Node.js version**: [e.g., 20.10.0]
-- **convex-devtools version**: [e.g., 1.0.0]
+- **convex-devtools version**: [e.g., 1.0.1]
 - **Package manager**: [npm/pnpm/yarn]
 
 ## Additional Context
