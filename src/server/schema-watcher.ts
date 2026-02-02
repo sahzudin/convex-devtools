@@ -334,9 +334,11 @@ export class SchemaWatcher extends EventEmitter {
     const args: ArgInfo[] = [];
     const jsdocParams = this.parseJSDocParams(jsdocComment);
 
+    // Limit parsing to the current function block to avoid false positives
+    const functionBlock = this.extractFunctionBlock(content, startIndex);
+
     // Find the args: { ... } section
-    const afterStart = content.slice(startIndex);
-    const argsMatch = afterStart.match(/args:\s*\{([^}]*)\}/s);
+    const argsMatch = functionBlock.match(/args:\s*\{([^}]*)\}/s);
 
     if (argsMatch) {
       const argsContent = argsMatch[1];
@@ -361,7 +363,7 @@ export class SchemaWatcher extends EventEmitter {
     }
 
     // Check for paginationOpts (built-in Convex pagination)
-    const hasPaginationOpts = afterStart.match(/paginationOptsValidator/s);
+    const hasPaginationOpts = functionBlock.match(/paginationOptsValidator/s);
     if (hasPaginationOpts) {
       // Add paginationOpts as a synthetic argument
       args.push({
@@ -373,6 +375,116 @@ export class SchemaWatcher extends EventEmitter {
     }
 
     return args;
+  }
+
+  private extractFunctionBlock(content: string, startIndex: number): string {
+    const afterStart = content.slice(startIndex);
+    const openIndex = afterStart.indexOf('{');
+    if (openIndex === -1) {
+      return afterStart;
+    }
+
+    let depth = 0;
+    let inSingle = false;
+    let inDouble = false;
+    let inTemplate = false;
+    let inLineComment = false;
+    let inBlockComment = false;
+    let escape = false;
+
+    for (let i = openIndex; i < afterStart.length; i += 1) {
+      const char = afterStart[i];
+      const next = afterStart[i + 1];
+
+      if (inLineComment) {
+        if (char === '\n') {
+          inLineComment = false;
+        }
+        continue;
+      }
+
+      if (inBlockComment) {
+        if (char === '*' && next === '/') {
+          inBlockComment = false;
+          i += 1;
+        }
+        continue;
+      }
+
+      if (inSingle) {
+        if (escape) {
+          escape = false;
+        } else if (char === '\\') {
+          escape = true;
+        } else if (char === "'") {
+          inSingle = false;
+        }
+        continue;
+      }
+
+      if (inDouble) {
+        if (escape) {
+          escape = false;
+        } else if (char === '\\') {
+          escape = true;
+        } else if (char === '"') {
+          inDouble = false;
+        }
+        continue;
+      }
+
+      if (inTemplate) {
+        if (escape) {
+          escape = false;
+        } else if (char === '\\') {
+          escape = true;
+        } else if (char === '`') {
+          inTemplate = false;
+        }
+        continue;
+      }
+
+      if (char === '/' && next === '/') {
+        inLineComment = true;
+        i += 1;
+        continue;
+      }
+
+      if (char === '/' && next === '*') {
+        inBlockComment = true;
+        i += 1;
+        continue;
+      }
+
+      if (char === "'") {
+        inSingle = true;
+        escape = false;
+        continue;
+      }
+
+      if (char === '"') {
+        inDouble = true;
+        escape = false;
+        continue;
+      }
+
+      if (char === '`') {
+        inTemplate = true;
+        escape = false;
+        continue;
+      }
+
+      if (char === '{') {
+        depth += 1;
+      } else if (char === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          return afterStart.slice(openIndex, i + 1);
+        }
+      }
+    }
+
+    return afterStart;
   }
 
   private async parseSchemaFile(convexDir: string): Promise<TableInfo[]> {
