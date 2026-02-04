@@ -1,6 +1,6 @@
 {
     "name": "convex-devtools",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "A standalone development tool for testing Convex queries, mutations, and actions with identity mocking and request management",
     "type": "module",
     "bin": {
