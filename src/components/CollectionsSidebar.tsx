@@ -3,10 +3,12 @@ import {
   usePersistenceStore,
   SavedRequest,
   HistoryEntry,
+  DataQueryHistoryEntry,
   // Subfolder - available for future subfolder feature
 } from '../stores/persistence-store';
 import { useRequestStore } from '../stores/request-store';
 import { FunctionInfo } from '../stores/schema-store';
+import { useDataExplorerStore } from '../stores/data-explorer-store';
 
 interface CollectionsSidebarProps {
   onClose: () => void;
@@ -17,6 +19,7 @@ export function CollectionsSidebar({ onClose }: CollectionsSidebarProps) {
     collections,
     // subfolders - available for future subfolder feature
     history,
+    dataHistory,
     createCollection,
     deleteCollection,
     renameCollection,
@@ -28,14 +31,27 @@ export function CollectionsSidebar({ onClose }: CollectionsSidebarProps) {
     deleteHistoryEntry,
     saveRequest,
     clearHistory,
+    deleteDataHistoryEntry,
+    clearDataHistory,
     exportData,
     importData,
   } = usePersistenceStore();
 
   const { setSelectedFunction, setArgs, setResponse } = useRequestStore();
+  const {
+    setSelectedTable,
+    setQueryMode,
+    setQueryText,
+    setUiFilters,
+    setUiOrder,
+    setResponse: setDataResponse,
+  } = useDataExplorerStore();
 
   const [activeTab, setActiveTab] = useState<'collections' | 'history'>(
     'collections'
+  );
+  const [historyType, setHistoryType] = useState<'functions' | 'queries'>(
+    'functions'
   );
   const [expandedCollections, setExpandedCollections] = useState<Set<string>>(
     new Set()
@@ -123,6 +139,19 @@ export function CollectionsSidebar({ onClose }: CollectionsSidebarProps) {
     } catch {
       setArgs(entry.args);
     }
+  };
+
+  const loadFromDataHistory = (entry: DataQueryHistoryEntry) => {
+    setSelectedTable(entry.table);
+    setQueryMode(entry.queryMode);
+    if (entry.uiFilters) {
+      setUiFilters(entry.uiFilters);
+    }
+    if (entry.uiOrder) {
+      setUiOrder(entry.uiOrder);
+    }
+    setQueryText(entry.queryText);
+    setDataResponse(entry.response);
   };
 
   const saveHistoryToCollection = (entry: HistoryEntry) => {
@@ -222,6 +251,18 @@ export function CollectionsSidebar({ onClose }: CollectionsSidebarProps) {
     );
   }, [history, historySearchQuery]);
 
+  const filteredDataHistory = useMemo(() => {
+    if (!historySearchQuery.trim()) {
+      return dataHistory;
+    }
+    const query = historySearchQuery.toLowerCase();
+    return dataHistory.filter(
+      (entry) =>
+        entry.table.toLowerCase().includes(query) ||
+        entry.queryText.toLowerCase().includes(query)
+    );
+  }, [dataHistory, historySearchQuery]);
+
   const typeColors = {
     query: 'text-blue-400',
     mutation: 'text-orange-400',
@@ -265,11 +306,11 @@ export function CollectionsSidebar({ onClose }: CollectionsSidebarProps) {
   return (
     <div className='w-72 border-r border-convex-border flex flex-col bg-convex-darker overflow-hidden'>
       {/* Header - Tabs with action buttons */}
-      <div className='flex items-center justify-between px-3 h-14 border-b border-convex-border flex-shrink-0'>
+      <div className='panel-tabs border-b border-convex-border flex-shrink-0 justify-between w-full'>
         <div className='flex items-center gap-1'>
           <button
             onClick={() => setActiveTab('collections')}
-            className={`px-3 py-1 text-sm font-medium rounded transition-colors ${
+            className={`panel-tab-btn font-medium transition-colors ${
               activeTab === 'collections'
                 ? 'bg-gray-300 dark:bg-convex-border text-gray-900 dark:text-white'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-convex-border/50'
@@ -279,7 +320,7 @@ export function CollectionsSidebar({ onClose }: CollectionsSidebarProps) {
           </button>
           <button
             onClick={() => setActiveTab('history')}
-            className={`px-3 py-1 text-sm font-medium rounded transition-colors ${
+            className={`panel-tab-btn font-medium transition-colors ${
               activeTab === 'history'
                 ? 'bg-gray-300 dark:bg-convex-border text-gray-900 dark:text-white'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-convex-border/50'
@@ -690,8 +731,32 @@ export function CollectionsSidebar({ onClose }: CollectionsSidebarProps) {
           </div>
         ) : (
           <div className='py-2'>
+            <div className='px-3 pb-2'>
+              <div className='panel-tabs rounded-lg p-1 w-full'>
+                <button
+                  onClick={() => setHistoryType('functions')}
+                  className={`flex-1 panel-tab-btn font-medium transition-colors ${
+                    historyType === 'functions'
+                      ? 'bg-gray-300 dark:bg-convex-border text-gray-900 dark:text-white'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-convex-border/50'
+                  }`}
+                >
+                  Functions
+                </button>
+                <button
+                  onClick={() => setHistoryType('queries')}
+                  className={`flex-1 panel-tab-btn font-medium transition-colors ${
+                    historyType === 'queries'
+                      ? 'bg-gray-300 dark:bg-convex-border text-gray-900 dark:text-white'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-convex-border/50'
+                  }`}
+                >
+                  Schema
+                </button>
+              </div>
+            </div>
             {/* Clear History */}
-            {filteredHistory.length > 0 && (
+            {historyType === 'functions' && filteredHistory.length > 0 && (
               <button
                 onClick={clearHistory}
                 className='w-full px-3 py-1.5 flex items-center gap-2 text-sm text-gray-400 hover:text-red-400 hover:bg-convex-border transition-colors'
@@ -712,142 +777,273 @@ export function CollectionsSidebar({ onClose }: CollectionsSidebarProps) {
                 Clear History
               </button>
             )}
-
-            {/* History List */}
-            {filteredHistory.map((entry) => {
-              // Check if the response indicates an error - same logic as ResponsePanel
-              const isError =
-                !entry.response.success ||
-                (entry.response.success &&
-                  entry.response.result &&
-                  typeof entry.response.result === 'object' &&
-                  (entry.response.result as Record<string, unknown>)?.status ===
-                    'error');
-
-              return (
-                <button
-                  key={entry.id}
-                  onClick={() => loadFromHistory(entry)}
-                  className='w-full px-3 py-2 hover:bg-convex-border transition-colors text-left'
+            {historyType === 'queries' && filteredDataHistory.length > 0 && (
+              <button
+                onClick={clearDataHistory}
+                className='w-full px-3 py-1.5 flex items-center gap-2 text-sm text-gray-400 hover:text-red-400 hover:bg-convex-border transition-colors'
+              >
+                <svg
+                  className='w-4 h-4'
+                  fill='none'
+                  stroke='currentColor'
+                  viewBox='0 0 24 24'
                 >
-                  {/* Function path with type badge */}
-                  <div className='flex items-start gap-2'>
-                    <span
-                      className={`text-xs font-mono font-semibold px-1.5 py-0.5 rounded flex-shrink-0 ${typeColors[entry.functionType]} ${
-                        entry.functionType === 'query'
-                          ? 'bg-blue-900/30'
-                          : entry.functionType === 'mutation'
-                            ? 'bg-orange-900/30'
-                            : 'bg-purple-900/30'
-                      }`}
-                    >
-                      {entry.functionType.charAt(0).toUpperCase()}
-                    </span>
-                    <span className='text-gray-300 font-mono text-sm break-all'>
-                      {entry.functionPath}
-                    </span>
-                  </div>
-                  {/* Time and status on left, action buttons on right */}
-                  <div className='flex items-center justify-between mt-1.5 pl-6'>
-                    <div className='flex items-center gap-2 text-xs text-gray-500'>
-                      <span>
-                        {new Date(entry.timestamp).toLocaleString(undefined, {
-                          dateStyle: 'short',
-                          timeStyle: 'short',
-                        })}
-                      </span>
-                      {!isError ? (
-                        <svg
-                          className='w-4 h-4 text-green-400'
-                          fill='none'
-                          stroke='currentColor'
-                          viewBox='0 0 24 24'
-                        >
-                          <path
-                            strokeLinecap='round'
-                            strokeLinejoin='round'
-                            strokeWidth={2}
-                            d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
-                          />
-                        </svg>
-                      ) : (
-                        <svg
-                          className='w-4 h-4 text-red-400'
-                          fill='none'
-                          stroke='currentColor'
-                          viewBox='0 0 24 24'
-                        >
-                          <path
-                            strokeLinecap='round'
-                            strokeLinejoin='round'
-                            strokeWidth={2}
-                            d='M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z'
-                          />
-                        </svg>
-                      )}
-                    </div>
-                    <div className='flex items-center gap-1'>
-                      <span
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          saveHistoryToCollection(entry);
-                        }}
-                        className='p-1 text-gray-500 hover:text-blue-500 dark:hover:text-convex-accent rounded hover:bg-gray-200 dark:hover:bg-convex-border cursor-pointer'
-                        title='Save to collection'
-                      >
-                        <svg
-                          className='w-4 h-4'
-                          fill='none'
-                          stroke='currentColor'
-                          viewBox='0 0 24 24'
-                        >
-                          <path
-                            strokeLinecap='round'
-                            strokeLinejoin='round'
-                            strokeWidth={2}
-                            d='M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4'
-                          />
-                        </svg>
-                      </span>
-                      <span
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteHistoryEntry(entry.id);
-                        }}
-                        className='p-1 text-gray-500 hover:text-red-500 dark:hover:text-red-400 rounded hover:bg-gray-200 dark:hover:bg-convex-border cursor-pointer'
-                        title='Delete'
-                      >
-                        <svg
-                          className='w-4 h-4'
-                          fill='none'
-                          stroke='currentColor'
-                          viewBox='0 0 24 24'
-                        >
-                          <path
-                            strokeLinecap='round'
-                            strokeLinejoin='round'
-                            strokeWidth={2}
-                            d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'
-                          />
-                        </svg>
-                      </span>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-
-            {filteredHistory.length === 0 && history.length > 0 && (
-              <p className='px-4 py-8 text-center text-sm text-gray-600'>
-                No results found for "{historySearchQuery}"
-              </p>
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth={2}
+                    d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'
+                  />
+                </svg>
+                Clear History
+              </button>
             )}
 
-            {history.length === 0 && (
+            {/* History List */}
+            {historyType === 'functions' &&
+              filteredHistory.map((entry) => {
+                // Check if the response indicates an error - same logic as ResponsePanel
+                const isError =
+                  !entry.response.success ||
+                  (entry.response.success &&
+                    entry.response.result &&
+                    typeof entry.response.result === 'object' &&
+                    (entry.response.result as Record<string, unknown>)
+                      ?.status === 'error');
+
+                return (
+                  <button
+                    key={entry.id}
+                    onClick={() => loadFromHistory(entry)}
+                    className='w-full px-3 py-2 hover:bg-convex-border transition-colors text-left text-sm'
+                  >
+                    {/* Function path with type badge */}
+                    <div className='flex items-start gap-2'>
+                      <span
+                        className={`text-xs font-mono font-semibold px-1.5 py-0.5 rounded flex-shrink-0 ${typeColors[entry.functionType]} ${
+                          entry.functionType === 'query'
+                            ? 'bg-blue-900/30'
+                            : entry.functionType === 'mutation'
+                              ? 'bg-orange-900/30'
+                              : 'bg-purple-900/30'
+                        }`}
+                      >
+                        {entry.functionType.charAt(0).toUpperCase()}
+                      </span>
+                      <span className='text-gray-300 font-mono text-sm break-all'>
+                        {entry.functionPath}
+                      </span>
+                    </div>
+                    {/* Time and status on left, action buttons on right */}
+                    <div className='flex items-center justify-between mt-1.5 pl-6'>
+                      <div className='flex items-center gap-2 text-xs text-gray-500'>
+                        <span>
+                          {new Date(entry.timestamp).toLocaleString(undefined, {
+                            dateStyle: 'short',
+                            timeStyle: 'short',
+                          })}
+                        </span>
+                        {!isError ? (
+                          <svg
+                            className='w-4 h-4 text-green-400'
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'
+                          >
+                            <path
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                              strokeWidth={2}
+                              d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
+                            />
+                          </svg>
+                        ) : (
+                          <svg
+                            className='w-4 h-4 text-red-400'
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'
+                          >
+                            <path
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                              strokeWidth={2}
+                              d='M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z'
+                            />
+                          </svg>
+                        )}
+                      </div>
+                      <div className='flex items-center gap-1'>
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            saveHistoryToCollection(entry);
+                          }}
+                          className='p-1 text-gray-500 hover:text-blue-500 dark:hover:text-convex-accent rounded hover:bg-gray-200 dark:hover:bg-convex-border cursor-pointer'
+                          title='Save to collection'
+                        >
+                          <svg
+                            className='w-4 h-4'
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'
+                          >
+                            <path
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                              strokeWidth={2}
+                              d='M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4'
+                            />
+                          </svg>
+                        </span>
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteHistoryEntry(entry.id);
+                          }}
+                          className='p-1 text-gray-500 hover:text-red-500 dark:hover:text-red-400 rounded hover:bg-gray-200 dark:hover:bg-convex-border cursor-pointer'
+                          title='Delete'
+                        >
+                          <svg
+                            className='w-4 h-4'
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'
+                          >
+                            <path
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                              strokeWidth={2}
+                              d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'
+                            />
+                          </svg>
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+
+            {historyType === 'queries' &&
+              filteredDataHistory.map((entry) => {
+                const isError =
+                  !entry.response.success ||
+                  (entry.response.success &&
+                    entry.response.result &&
+                    typeof entry.response.result === 'object' &&
+                    (entry.response.result as Record<string, unknown>)
+                      ?.status === 'error');
+
+                return (
+                  <button
+                    key={entry.id}
+                    onClick={() => loadFromDataHistory(entry)}
+                    className='w-full px-3 py-2 hover:bg-convex-border transition-colors text-left'
+                  >
+                    <div className='flex items-start gap-2'>
+                      <span className='text-xs font-mono font-semibold px-1.5 py-0.5 rounded flex-shrink-0 text-green-400 bg-green-900/30'>
+                        D
+                      </span>
+                      <span className='text-gray-300 font-mono text-sm break-all'>
+                        {entry.table}
+                      </span>
+                    </div>
+                    <div className='flex items-center justify-between mt-1.5 pl-6'>
+                      <div className='flex items-center gap-2 text-xs text-gray-500'>
+                        <span>
+                          {new Date(entry.timestamp).toLocaleString(undefined, {
+                            dateStyle: 'short',
+                            timeStyle: 'short',
+                          })}
+                        </span>
+                        {!isError ? (
+                          <svg
+                            className='w-4 h-4 text-green-400'
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'
+                          >
+                            <path
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                              strokeWidth={2}
+                              d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
+                            />
+                          </svg>
+                        ) : (
+                          <svg
+                            className='w-4 h-4 text-red-400'
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'
+                          >
+                            <path
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                              strokeWidth={2}
+                              d='M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z'
+                            />
+                          </svg>
+                        )}
+                      </div>
+                      <div className='flex items-center gap-1'>
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteDataHistoryEntry(entry.id);
+                          }}
+                          className='p-1 text-gray-500 hover:text-red-500 dark:hover:text-red-400 rounded hover:bg-gray-200 dark:hover:bg-convex-border cursor-pointer'
+                          title='Delete'
+                        >
+                          <svg
+                            className='w-4 h-4'
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'
+                          >
+                            <path
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                              strokeWidth={2}
+                              d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'
+                            />
+                          </svg>
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+
+            {historyType === 'functions' &&
+              filteredHistory.length === 0 &&
+              history.length > 0 && (
+                <p className='px-4 py-8 text-center text-sm text-gray-600'>
+                  No results found for "{historySearchQuery}"
+                </p>
+              )}
+
+            {historyType === 'functions' && history.length === 0 && (
               <p className='px-4 py-8 text-center text-sm text-gray-600'>
                 No history yet.
                 <br />
                 Run some functions to see them here.
+              </p>
+            )}
+
+            {historyType === 'queries' &&
+              filteredDataHistory.length === 0 &&
+              dataHistory.length > 0 && (
+                <p className='px-4 py-8 text-center text-sm text-gray-600'>
+                  No results found for "{historySearchQuery}"
+                </p>
+              )}
+
+            {historyType === 'queries' && dataHistory.length === 0 && (
+              <p className='px-4 py-8 text-center text-sm text-gray-600'>
+                No query history yet.
+                <br />
+                Run some schema queries to see them here.
               </p>
             )}
           </div>

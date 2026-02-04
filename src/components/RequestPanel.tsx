@@ -1,10 +1,13 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRequestStore } from '../stores/request-store';
 import { usePersistenceStore } from '../stores/persistence-store';
 
 export function RequestPanel() {
   const {
     selectedFunction,
+    recentTabs,
+    removeFromRecentTabs,
+    setSelectedFunction,
     args,
     jwtToken,
     isLoading,
@@ -20,6 +23,12 @@ export function RequestPanel() {
   const [saveName, setSaveName] = useState('');
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!selectedFunction && recentTabs.length > 0) {
+      setSelectedFunction(recentTabs[0]);
+    }
+  }, [selectedFunction, recentTabs, setSelectedFunction]);
 
   const handleInvoke = async () => {
     // Auto-format JSON before running
@@ -77,29 +86,6 @@ export function RequestPanel() {
     }
   };
 
-  if (!selectedFunction) {
-    return (
-      <div className='flex items-center justify-center h-full text-gray-500'>
-        <div className='text-center'>
-          <svg
-            className='w-16 h-16 mx-auto mb-4 text-gray-600'
-            fill='none'
-            stroke='currentColor'
-            viewBox='0 0 24 24'
-          >
-            <path
-              strokeLinecap='round'
-              strokeLinejoin='round'
-              strokeWidth={1}
-              d='M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'
-            />
-          </svg>
-          <p>Select a function from the tree to get started</p>
-        </div>
-      </div>
-    );
-  }
-
   const typeColors = {
     query: 'text-blue-400 border-blue-400',
     mutation: 'text-orange-400 border-orange-400',
@@ -109,123 +95,213 @@ export function RequestPanel() {
   return (
     <div className='flex flex-col h-full'>
       {/* Header - Compact */}
-      <div className='flex items-center justify-between px-3 py-2 border-b border-convex-border'>
-        <div className='flex items-center gap-2 min-w-0'>
-          <span
-            className={`text-[10px] font-mono font-semibold px-1.5 py-0.5 border rounded flex-shrink-0 ${typeColors[selectedFunction.type]}`}
-          >
-            {selectedFunction.type.charAt(0).toUpperCase()}
-          </span>
-          <span className='font-mono text-sm truncate'>
-            {selectedFunction.path}
-          </span>
-          {/* JWT Auth Status Icon */}
-          {jwtToken ? (
-            <span
-              className='flex-shrink-0 text-green-400 cursor-help'
-              title='Authenticated with JWT token'
-            >
-              <svg
-                className='w-4 h-4'
-                fill='none'
-                stroke='currentColor'
-                viewBox='0 0 24 24'
-              >
-                <path
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                  strokeWidth={2}
-                  d='M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'
-                />
-              </svg>
-            </span>
-          ) : (
-            <span
-              className='flex-shrink-0 text-gray-500 cursor-help'
-              title='No authentication - Click key icon in header to add JWT'
-            >
-              <svg
-                className='w-4 h-4'
-                fill='none'
-                stroke='currentColor'
-                viewBox='0 0 24 24'
-              >
-                <path
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                  strokeWidth={2}
-                  d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'
-                />
-              </svg>
-            </span>
-          )}
-        </div>
-
-        <div className='flex items-center gap-2 flex-shrink-0'>
-          <button
-            onClick={handleOpenSaveModal}
-            className='p-1.5 text-gray-400 hover:text-white hover:bg-convex-border rounded transition-colors'
-            title='Save to Collection'
-          >
-            <svg
-              className='w-4 h-4'
-              fill='none'
-              stroke='currentColor'
-              viewBox='0 0 24 24'
-            >
-              <path
-                strokeLinecap='round'
-                strokeLinejoin='round'
-                strokeWidth={2}
-                d='M8 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7.828a2 2 0 00-.586-1.414l-1.828-1.828A2 2 0 0016.172 4H16M8 4v4m0-4h4m0 0v4m0-4h4v4M8 8h8M8 12h8m-8 4h6'
-              />
-            </svg>
-          </button>
-
-          <button
-            onClick={handleInvoke}
-            disabled={isLoading || !isArgsValid}
-            className={`px-3 py-1 rounded font-medium text-sm transition-colors flex items-center gap-1.5 min-w-[70px] justify-center ${
-              isLoading
-                ? 'bg-gray-600 cursor-not-allowed'
-                : 'bg-convex-accent hover:bg-convex-accent-hover'
-            }`}
-          >
-            {isLoading ? (
-              <svg className='animate-spin w-3.5 h-3.5' viewBox='0 0 24 24'>
-                <circle
-                  className='opacity-25'
-                  cx='12'
-                  cy='12'
-                  r='10'
-                  stroke='currentColor'
-                  strokeWidth='4'
-                  fill='none'
-                />
-                <path
-                  className='opacity-75'
-                  fill='currentColor'
-                  d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
-                />
-              </svg>
-            ) : (
+      <div className='h-12 flex items-center justify-between px-3 border-b border-convex-border'>
+          <div className='flex items-center gap-2 min-w-0'>
+            {selectedFunction ? (
               <>
+                <span
+                  className={`text-[10px] font-mono font-semibold px-1.5 py-0.5 border rounded flex-shrink-0 ${typeColors[selectedFunction.type]}`}
+                >
+                  {selectedFunction.type.charAt(0).toUpperCase()}
+                </span>
+                <span className='font-mono text-sm truncate'>
+                  {selectedFunction.path}
+                </span>
+              </>
+            ) : (
+              <span className='text-sm text-gray-500'>No function selected</span>
+            )}
+            {/* JWT Auth Status Icon */}
+            {jwtToken ? (
+              <span
+                className='flex-shrink-0 text-green-400 cursor-help'
+                title='Authenticated with JWT token'
+              >
                 <svg
-                  className='w-3.5 h-3.5'
-                  fill='currentColor'
+                  className='w-4 h-4'
+                  fill='none'
+                  stroke='currentColor'
                   viewBox='0 0 24 24'
                 >
-                  <path d='M8 5v14l11-7z' />
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth={2}
+                    d='M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'
+                  />
                 </svg>
-                Run
-              </>
+              </span>
+            ) : (
+              <span
+                className='flex-shrink-0 text-gray-500 cursor-help'
+                title='No authentication - Click key icon in header to add JWT'
+              >
+                <svg
+                  className='w-4 h-4'
+                  fill='none'
+                  stroke='currentColor'
+                  viewBox='0 0 24 24'
+                >
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth={2}
+                    d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'
+                  />
+                </svg>
+              </span>
             )}
-          </button>
+          </div>
+
+          <div className='flex items-center gap-2 flex-shrink-0'>
+            <button
+              onClick={handleOpenSaveModal}
+              disabled={!selectedFunction}
+              className='p-1.5 text-gray-400 hover:text-white hover:bg-convex-border rounded transition-colors'
+              title='Save to Collection'
+            >
+              <svg
+                className='w-4 h-4'
+                fill='none'
+                stroke='currentColor'
+                viewBox='0 0 24 24'
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth={2}
+                  d='M8 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7.828a2 2 0 00-.586-1.414l-1.828-1.828A2 2 0 0016.172 4H16M8 4v4m0-4h4m0 0v4m0-4h4v4M8 8h8M8 12h8m-8 4h6'
+                />
+              </svg>
+            </button>
+
+            <button
+              onClick={handleInvoke}
+              disabled={!selectedFunction || isLoading || !isArgsValid}
+              className={`btn-compact font-medium text-sm transition-colors flex items-center gap-1.5 min-w-[70px] justify-center ${
+                isLoading
+                  ? 'bg-gray-600 cursor-not-allowed'
+                  : 'bg-convex-accent hover:bg-convex-accent-hover'
+              }`}
+            >
+              {isLoading ? (
+                <svg className='animate-spin w-3.5 h-3.5' viewBox='0 0 24 24'>
+                  <circle
+                    className='opacity-25'
+                    cx='12'
+                    cy='12'
+                    r='10'
+                    stroke='currentColor'
+                    strokeWidth='4'
+                    fill='none'
+                  />
+                  <path
+                    className='opacity-75'
+                    fill='currentColor'
+                    d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                  />
+                </svg>
+              ) : (
+                <>
+                  <svg
+                    className='w-3.5 h-3.5'
+                    fill='currentColor'
+                    viewBox='0 0 24 24'
+                  >
+                    <path d='M8 5v14l11-7z' />
+                  </svg>
+                  Run
+                </>
+              )}
+            </button>
+          </div>
         </div>
+
+      {/* Recent Tabs Bar */}
+      <div className='h-14 flex items-center gap-2 px-2 py-1 bg-convex-darker border-b border-convex-border flex-shrink-0 overflow-x-auto scrollbar-hide'>
+        {recentTabs.length === 0 ? (
+          <span className='text-xs text-gray-500 px-2'>
+            Recent tabs will appear here
+          </span>
+        ) : (
+          recentTabs.map((tab) => {
+            const isActive = selectedFunction?.path === tab.path;
+            const typeColor =
+              tab.type === 'query'
+                ? 'text-blue-400'
+                : tab.type === 'mutation'
+                  ? 'text-orange-400'
+                  : 'text-purple-400';
+            return (
+              <div
+                key={tab.path}
+                className={`flex items-center gap-2 pl-3 pr-2 h-8 rounded-lg text-sm font-mono transition-colors border ${
+                  isActive
+                    ? 'bg-gray-300 dark:bg-convex-border text-gray-900 dark:text-white border-convex-border'
+                    : 'hover:bg-gray-200 dark:hover:bg-convex-border/50 text-gray-600 dark:text-gray-400 border-transparent'
+                }`}
+                title={tab.path}
+              >
+                <button
+                  onClick={() => setSelectedFunction(tab)}
+                  className='flex items-center gap-1 truncate max-w-[160px]'
+                >
+                  <span className={`font-semibold flex-shrink-0 ${typeColor}`}>
+                    {tab.type.charAt(0).toUpperCase()}
+                  </span>
+                  <span className='truncate'>{tab.name}</span>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeFromRecentTabs(tab.path);
+                  }}
+                  className='p-0.5 rounded hover:bg-convex-dark text-gray-500 hover:text-white transition-colors flex-shrink-0'
+                  title='Close tab'
+                >
+                  <svg
+                    className='w-3 h-3'
+                    fill='none'
+                    stroke='currentColor'
+                    viewBox='0 0 24 24'
+                  >
+                    <path
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth={2}
+                      d='M6 18L18 6M6 6l12 12'
+                    />
+                  </svg>
+                </button>
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* Main Content Area with Args Editor and Arguments Panel */}
       <div className='flex-1 flex overflow-hidden'>
+        {!selectedFunction ? (
+          <div className='flex-1 flex items-center justify-center text-gray-500'>
+            <div className='text-center'>
+              <svg
+                className='w-16 h-16 mx-auto mb-4 text-gray-600'
+                fill='none'
+                stroke='currentColor'
+                viewBox='0 0 24 24'
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth={1}
+                  d='M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'
+                />
+              </svg>
+              <p>Select a function from the tree to get started</p>
+            </div>
+          </div>
+        ) : (
+          <>
         {/* Args Editor */}
         <div className='flex-1 flex flex-col p-4'>
           <div className='flex items-center justify-between mb-2'>
@@ -425,10 +501,12 @@ export function RequestPanel() {
             </div>
           </div>
         )}
+          </>
+        )}
       </div>
 
       {/* Save Modal */}
-      {showSaveModal && (
+      {showSaveModal && selectedFunction && (
         <div className='fixed inset-0 bg-black/50 flex items-center justify-center z-50'>
           <div className='bg-convex-dark border border-convex-border rounded-lg p-6 w-96'>
             <h3 className='text-lg font-semibold mb-4'>Save to Collection</h3>

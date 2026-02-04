@@ -2,6 +2,13 @@ import chokidar from 'chokidar';
 import { EventEmitter } from 'events';
 import fs from 'fs';
 import path from 'path';
+import {
+  CallExpression,
+  Expression,
+  Node,
+  Project,
+  SyntaxKind,
+} from 'ts-morph';
 
 export interface FunctionInfo {
   name: string;
@@ -29,7 +36,7 @@ export interface ModuleInfo {
 export interface SchemaInfo {
   modules: ModuleInfo[];
   tables: TableInfo[];
-  lastUpdated: Date;
+  lastUpdated: string;
 }
 
 export interface TableInfo {
@@ -108,7 +115,7 @@ export class SchemaWatcher extends EventEmitter {
       this.schemaInfo = {
         modules,
         tables,
-        lastUpdated: new Date(),
+        lastUpdated: new Date().toISOString(),
       };
 
       const funcCount = this.countFunctions(modules);
@@ -497,15 +504,60 @@ export class SchemaWatcher extends EventEmitter {
 
     try {
       const content = fs.readFileSync(schemaPath, 'utf-8');
+      const project = new Project({ useInMemoryFileSystem: true });
+      const sourceFile = project.createSourceFile(
+        'schema.ts',
+        content,
+        { overwrite: true }
+      );
 
-      // Match table definitions: tableName: defineTable(
-      const tablePattern = /(\w+):\s*defineTable\(/g;
+      const defineSchemaCall = sourceFile
+        .getDescendantsOfKind(SyntaxKind.CallExpression)
+        .find(
+          (call) => call.getExpression().getText() === 'defineSchema'
+        );
 
-      let match;
-      while ((match = tablePattern.exec(content)) !== null) {
+      if (!defineSchemaCall) {
+        return tables;
+      }
+
+      const schemaArg = defineSchemaCall.getArguments()[0];
+      if (!schemaArg || !Node.isObjectLiteralExpression(schemaArg)) {
+        return tables;
+      }
+
+      for (const prop of schemaArg.getProperties()) {
+        if (!Node.isPropertyAssignment(prop)) continue;
+
+        const tableName = this.normalizePropertyName(prop.getName());
+        const initializer = prop.getInitializer();
+        if (!initializer) continue;
+
+        const defineTableCall = this.findDefineTableCall(initializer);
+        if (!defineTableCall) continue;
+
+        const fieldsArg = defineTableCall.getArguments()[0];
+        const fields: FieldInfo[] = [];
+
+        if (fieldsArg && Node.isObjectLiteralExpression(fieldsArg)) {
+          for (const fieldProp of fieldsArg.getProperties()) {
+            if (!Node.isPropertyAssignment(fieldProp)) continue;
+            const fieldName = this.normalizePropertyName(fieldProp.getName());
+            const fieldInit = fieldProp.getInitializer();
+            if (!fieldInit) continue;
+
+            const parsedField = this.parseFieldInfo(fieldInit);
+            fields.push({
+              name: fieldName,
+              type: parsedField.type,
+              optional: parsedField.optional,
+            });
+          }
+        }
+
         tables.push({
-          name: match[1],
-          fields: [], // Could parse fields but keeping simple for now
+          name: tableName,
+          fields,
         });
       }
     } catch (error) {
@@ -513,5 +565,64 @@ export class SchemaWatcher extends EventEmitter {
     }
 
     return tables;
+  }
+
+  private findDefineTableCall(
+    expr: Expression
+  ): CallExpression | null {
+    if (Node.isCallExpression(expr)) {
+      const callee = expr.getExpression();
+      if (Node.isIdentifier(callee) && callee.getText() === 'defineTable') {
+        return expr;
+      }
+      if (Node.isPropertyAccessExpression(callee)) {
+        const inner = callee.getExpression();
+        if (Node.isCallExpression(inner)) {
+          return this.findDefineTableCall(inner);
+        }
+        if (Node.isPropertyAccessExpression(inner)) {
+          return this.findDefineTableCall(inner.getExpression());
+        }
+      }
+    }
+
+    if (Node.isPropertyAccessExpression(expr)) {
+      return this.findDefineTableCall(expr.getExpression());
+    }
+
+    return null;
+  }
+
+  private parseFieldInfo(
+    expr: Expression
+  ): { type: string; optional: boolean } {
+    let optional = false;
+    let typeExpr: Expression | undefined = expr;
+
+    if (Node.isCallExpression(expr)) {
+      const calleeText = expr.getExpression().getText();
+      if (calleeText === 'v.optional') {
+        optional = true;
+        const inner = expr.getArguments()[0];
+        if (inner && Node.isExpression(inner)) {
+          typeExpr = inner;
+        }
+      }
+    }
+
+    return {
+      type: typeExpr?.getText() ?? 'unknown',
+      optional,
+    };
+  }
+
+  private normalizePropertyName(name: string): string {
+    if (
+      (name.startsWith("'") && name.endsWith("'")) ||
+      (name.startsWith('"') && name.endsWith('"'))
+    ) {
+      return name.slice(1, -1);
+    }
+    return name;
   }
 }

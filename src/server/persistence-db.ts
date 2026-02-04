@@ -6,11 +6,13 @@ import initSqlJs, { Database, SqlJsStatic } from 'sql.js';
 export interface PersistenceData {
   collections: unknown[];
   history: unknown[];
+  dataHistory: unknown[];
 }
 
 const DEFAULT_DATA: PersistenceData = {
   collections: [],
   history: [],
+  dataHistory: [],
 };
 
 export class PersistenceDb {
@@ -83,6 +85,7 @@ export class PersistenceDb {
           ? parsed.collections
           : [],
         history: Array.isArray(parsed.history) ? parsed.history : [],
+        dataHistory: Array.isArray(parsed.dataHistory) ? parsed.dataHistory : [],
       };
     } catch {
       return DEFAULT_DATA;
@@ -93,6 +96,7 @@ export class PersistenceDb {
     const payload = JSON.stringify({
       collections: Array.isArray(data.collections) ? data.collections : [],
       history: Array.isArray(data.history) ? data.history : [],
+      dataHistory: Array.isArray(data.dataHistory) ? data.dataHistory : [],
     });
 
     this.db.run(

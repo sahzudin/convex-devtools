@@ -6,18 +6,21 @@
   <img src="https://img.shields.io/npm/dt/convex-devtools" alt="downloads">
 </p>
 
-A standalone development tool for testing Convex queries, mutations, and actions with identity mocking, request saving, and auto-reloading schema discovery.
+A standalone development tool for testing Convex functions and exploring data with identity mocking, request saving, schema discovery, and a schema‑driven Data Explorer.
 
-> 💡 **Note**: This tool is designed for **development and testing**. A deploy key is optional but enables identity mocking features.
+> 💡 **Note**: This tool is designed for **development and testing**. A deploy key is required for Data Explorer queries.
 
 ## Features
 
 - 🔍 **Function Explorer** - Browse all your Convex queries, mutations, and actions in a tree view
 - 🎭 **Identity Mocking** - Test functions as different users with custom roles and claims
 - 💾 **Request Collections** - Save and organize requests like Postman
-- 📜 **History** - View and replay previous function calls
+- 📜 **History** - View and replay previous function calls and schema queries
 - 🔄 **Auto-reload** - Schema updates automatically when your Convex files change
 - 📤 **Import/Export** - Share collections with your team
+- 🧭 **Data Explorer** - Schema‑driven table view, column picker, pagination, and JSON view
+- 🧱 **Query Builder** - Build filters/order via UI or switch to raw JSON
+- 🗂️ **Query Tabs** - Recent tabs for functions and schema queries
 
 ## Quick Start
 
@@ -74,6 +77,19 @@ convex-devtools --no-open
 ```
 
 The tool will automatically open in your browser at `http://localhost:5173`.
+
+## Data Explorer (Schema Queries)
+
+The Data Explorer lets you run read‑only schema queries against `ctx.db.query()` in your Convex project:
+
+- **Builder**: pick table, order, and filters with a UI
+- **JSON**: edit the query payload directly
+- **Table view**: column picker, pagination, and search
+- **JSON view**: raw response with search
+- **Resizable panes**: adjust the Data Explorer/Response split
+- **Recent tabs**: quickly jump between recent schema queries
+
+The helper query uses Convex pagination (cursor + page size). The deploy key is required to run these queries.
 
 ## CLI Options
 
@@ -138,7 +154,7 @@ The export format is a simple JSON structure:
 
 ```json
 {
-  "version": "1.0",
+  "version": "1.1.0",
   "exportedAt": "2025-01-29T10:00:00.000Z",
   "collections": [
     {

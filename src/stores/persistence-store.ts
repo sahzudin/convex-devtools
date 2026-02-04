@@ -37,8 +37,20 @@ export interface HistoryEntry {
   timestamp: string;
 }
 
+export interface DataQueryHistoryEntry {
+  id: string;
+  projectName?: string;
+  table: string;
+  queryMode: 'json' | 'ui';
+  queryText: string;
+  uiFilters?: { field: string; op: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte'; value: string }[];
+  uiOrder?: 'asc' | 'desc';
+  response: InvokeResponse;
+  timestamp: string;
+}
+
 export interface ExportData {
-  version: '1.0';
+  version: '1.1.0';
   exportedAt: string;
   collections: Collection[];
 }
@@ -50,6 +62,7 @@ interface PersistenceState {
   collections: Collection[];
   subfolders: Subfolder[];
   history: HistoryEntry[];
+  dataHistory: DataQueryHistoryEntry[];
   savedToken: string;
 
   // Collection actions
@@ -94,6 +107,9 @@ interface PersistenceState {
   addToHistory: (entry: Omit<HistoryEntry, 'id'>) => void;
   deleteHistoryEntry: (id: string) => void;
   clearHistory: () => void;
+  addToDataHistory: (entry: Omit<DataQueryHistoryEntry, 'id'>) => void;
+  deleteDataHistoryEntry: (id: string) => void;
+  clearDataHistory: () => void;
 
   // Persistence actions
   loadFromStorage: () => Promise<void>;
@@ -108,6 +124,7 @@ export const usePersistenceStore = create<PersistenceState>((set, get) => ({
   collections: [],
   subfolders: [],
   history: [],
+  dataHistory: [],
   savedToken: '',
 
   createCollection: (name, folder) => {
@@ -306,6 +323,30 @@ export const usePersistenceStore = create<PersistenceState>((set, get) => ({
     void get().saveToStorage();
   },
 
+  addToDataHistory: (entry) => {
+    const historyEntry: DataQueryHistoryEntry = {
+      id: nanoid(),
+      ...entry,
+    };
+
+    set((state) => ({
+      dataHistory: [historyEntry, ...state.dataHistory].slice(0, 100),
+    }));
+    void get().saveToStorage();
+  },
+
+  deleteDataHistoryEntry: (id) => {
+    set((state) => ({
+      dataHistory: state.dataHistory.filter((h) => h.id !== id),
+    }));
+    void get().saveToStorage();
+  },
+
+  clearDataHistory: () => {
+    set({ dataHistory: [] });
+    void get().saveToStorage();
+  },
+
   loadFromStorage: async () => {
     try {
       const response = await fetch('/api/persistence');
@@ -315,6 +356,7 @@ export const usePersistenceStore = create<PersistenceState>((set, get) => ({
           collections: Array.isArray(data.collections) ? data.collections : [],
           subfolders: Array.isArray(data.subfolders) ? data.subfolders : [],
           history: Array.isArray(data.history) ? data.history : [],
+          dataHistory: Array.isArray(data.dataHistory) ? data.dataHistory : [],
         });
         return;
       }
@@ -330,6 +372,7 @@ export const usePersistenceStore = create<PersistenceState>((set, get) => ({
           collections: data.collections || [],
           subfolders: data.subfolders || [],
           history: data.history || [],
+          dataHistory: data.dataHistory || [],
         });
       }
     } catch (err) {
@@ -339,11 +382,11 @@ export const usePersistenceStore = create<PersistenceState>((set, get) => ({
 
   saveToStorage: async () => {
     try {
-      const { collections, subfolders, history } = get();
+      const { collections, subfolders, history, dataHistory } = get();
       const response = await fetch('/api/persistence', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ collections, subfolders, history }),
+        body: JSON.stringify({ collections, subfolders, history, dataHistory }),
       });
       if (response.ok) {
         return;
@@ -353,10 +396,10 @@ export const usePersistenceStore = create<PersistenceState>((set, get) => ({
     }
 
     try {
-      const { collections, subfolders, history } = get();
+      const { collections, subfolders, history, dataHistory } = get();
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ collections, subfolders, history })
+        JSON.stringify({ collections, subfolders, history, dataHistory })
       );
     } catch (err) {
       console.error('Failed to save to local storage:', err);
@@ -366,14 +409,14 @@ export const usePersistenceStore = create<PersistenceState>((set, get) => ({
   exportData: () => {
     const { collections } = get();
     return {
-      version: '1.0' as const,
+      version: '1.1.0' as const,
       exportedAt: new Date().toISOString(),
       collections,
     };
   },
 
   importData: (data) => {
-    if (data.version !== '1.0') {
+    if (data.version !== '1.1.0') {
       throw new Error(`Unsupported export version: ${data.version}`);
     }
 

@@ -1,16 +1,25 @@
 import { useState, useEffect } from 'react';
 import { FunctionTree } from './components/FunctionTree';
+import { SchemaExplorer } from './components/SchemaExplorer';
 import { RequestPanel } from './components/RequestPanel';
 import { ResponsePanel } from './components/ResponsePanel';
+import { DataExplorerPanel } from './components/DataExplorerPanel';
+import { DataResponsePanel } from './components/DataResponsePanel';
 import { CollectionsSidebar } from './components/CollectionsSidebar';
 import { AuthPanel } from './components/AuthPanel';
 import { useSchemaStore } from './stores/schema-store';
 import { useRequestStore } from './stores/request-store';
 import { usePersistenceStore } from './stores/persistence-store';
+import { useDataExplorerStore } from './stores/data-explorer-store';
 
 function App() {
   const [showAuthPanel, setShowAuthPanel] = useState(false);
   const [showCollections, setShowCollections] = useState(true);
+  const [mainMode, setMainMode] = useState<'functions' | 'data'>(
+    'functions'
+  );
+  const [dataSplitHeight, setDataSplitHeight] = useState(360);
+  const [isResizingDataSplit, setIsResizingDataSplit] = useState(false);
   const [convexUrl, setConvexUrl] = useState<string>('');
   const [projectName, setProjectName] = useState<string>('');
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
@@ -31,9 +40,8 @@ function App() {
     jwtToken,
     setJwtToken,
     setProjectName: setProjectNameInStore,
-    recentTabs,
-    removeFromRecentTabs,
   } = useRequestStore();
+  const { selectedTable, setSelectedTable } = useDataExplorerStore();
   const { loadFromStorage, loadSavedToken } = usePersistenceStore();
 
   // Compute the actual theme based on system preference
@@ -53,6 +61,22 @@ function App() {
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
+
+  useEffect(() => {
+    if (!isResizingDataSplit) return;
+    const handleMove = (event: MouseEvent) => {
+      const viewportTop = 56; // header
+      const next = Math.min(640, Math.max(220, event.clientY - viewportTop));
+      setDataSplitHeight(next);
+    };
+    const handleUp = () => setIsResizingDataSplit(false);
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+    };
+  }, [isResizingDataSplit]);
 
   // Compute actual theme
   const actualTheme =
@@ -80,6 +104,12 @@ function App() {
       })
       .catch(() => {});
   }, [connect, loadFromStorage, loadSavedToken, setJwtToken, jwtToken]);
+
+  useEffect(() => {
+    if (selectedFunction) {
+      setMainMode('functions');
+    }
+  }, [selectedFunction]);
 
   // Reload persistence when window regains focus to sync across instances
   useEffect(() => {
@@ -130,7 +160,7 @@ function App() {
           </div>
           <h1 className='text-lg font-semibold'>Convex DevTools</h1>
           <span className='text-xs px-2 py-0.5 bg-convex-border rounded text-gray-400'>
-            v0.1.0
+            v1.1.0
           </span>
           <span className='ml-2 text-xs px-3 py-1 rounded-full border border-convex-border text-gray-300 bg-convex-darker flex items-center gap-2'>
             <svg
@@ -289,85 +319,78 @@ function App() {
         )}
 
         {/* Function Tree */}
-        <div className='w-72 border-r border-convex-border flex-shrink-0 overflow-auto'>
-          <FunctionTree
-            schema={schema}
-            selectedFunction={selectedFunction}
-            onSelectFunction={setSelectedFunction}
-          />
+        <div className='w-72 border-r border-convex-border flex-shrink-0 overflow-auto flex flex-col'>
+          <div className='panel-tabs border-b border-convex-border'>
+            <button
+              onClick={() => setMainMode('functions')}
+              className={`flex-1 panel-tab-btn transition-colors ${
+                mainMode === 'functions'
+                  ? 'bg-convex-accent text-white'
+                  : 'text-gray-400 hover:bg-convex-border'
+              }`}
+            >
+              Functions
+            </button>
+            <button
+              onClick={() => setMainMode('data')}
+              className={`flex-1 panel-tab-btn transition-colors ${
+                mainMode === 'data'
+                  ? 'bg-convex-accent text-white'
+                  : 'text-gray-400 hover:bg-convex-border'
+              }`}
+            >
+              Schema
+            </button>
+          </div>
+
+          <div className='flex-1 overflow-auto'>
+            {mainMode === 'functions' ? (
+              <FunctionTree
+                schema={schema}
+                selectedFunction={selectedFunction}
+                onSelectFunction={setSelectedFunction}
+              />
+            ) : (
+              <SchemaExplorer
+                schema={schema}
+                selectedTable={selectedTable}
+                onSelectTable={setSelectedTable}
+              />
+            )}
+          </div>
         </div>
 
         {/* Main Area */}
         <div className='flex-1 flex flex-col min-w-0'>
-          {/* Recent Tabs Bar */}
-          {recentTabs.length > 0 && (
-            <div className='flex items-center gap-1 px-2 py-1 bg-convex-darker border-b border-convex-border overflow-x-auto flex-shrink-0'>
-              {recentTabs.map((tab) => {
-                const isActive = selectedFunction?.path === tab.path;
-                const typeColor =
-                  tab.type === 'query'
-                    ? 'text-blue-400'
-                    : tab.type === 'mutation'
-                      ? 'text-orange-400'
-                      : 'text-purple-400';
-                return (
-                  <div
-                    key={tab.path}
-                    className={`flex items-center gap-1 pl-2 pr-1 py-0.5 rounded text-xs font-mono transition-colors ${
-                      isActive
-                        ? 'bg-gray-300 dark:bg-convex-border text-gray-900 dark:text-white'
-                        : 'hover:bg-gray-200 dark:hover:bg-convex-border/50 text-gray-600 dark:text-gray-400'
-                    }`}
-                    title={tab.path}
-                  >
-                    <button
-                      onClick={() => setSelectedFunction(tab)}
-                      className='flex items-center gap-1 truncate max-w-[150px]'
-                    >
-                      <span
-                        className={`font-semibold flex-shrink-0 ${typeColor}`}
-                      >
-                        {tab.type.charAt(0).toUpperCase()}
-                      </span>
-                      <span className='truncate'>{tab.name}</span>
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeFromRecentTabs(tab.path);
-                      }}
-                      className='p-0.5 rounded hover:bg-convex-dark text-gray-500 hover:text-white transition-colors flex-shrink-0'
-                      title='Close tab'
-                    >
-                      <svg
-                        className='w-3 h-3'
-                        fill='none'
-                        stroke='currentColor'
-                        viewBox='0 0 24 24'
-                      >
-                        <path
-                          strokeLinecap='round'
-                          strokeLinejoin='round'
-                          strokeWidth={2}
-                          d='M6 18L18 6M6 6l12 12'
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+          {mainMode === 'functions' ? (
+            <>
+              {/* Request Panel */}
+              <div className='h-1/2 border-b border-convex-border overflow-auto'>
+                <RequestPanel />
+              </div>
+
+              {/* Response Panel */}
+              <div className='h-1/2 overflow-auto'>
+                <ResponsePanel />
+              </div>
+            </>
+          ) : (
+            <>
+              <div
+                className='border-b border-convex-border overflow-auto'
+                style={{ height: dataSplitHeight }}
+              >
+                <DataExplorerPanel />
+              </div>
+              <div
+                className='h-1.5 cursor-row-resize bg-transparent hover:bg-convex-border/40'
+                onMouseDown={() => setIsResizingDataSplit(true)}
+              />
+              <div className='flex-1 overflow-auto'>
+                <DataResponsePanel />
+              </div>
+            </>
           )}
-
-          {/* Request Panel */}
-          <div className='h-1/2 border-b border-convex-border overflow-auto'>
-            <RequestPanel />
-          </div>
-
-          {/* Response Panel */}
-          <div className='h-1/2 overflow-auto'>
-            <ResponsePanel />
-          </div>
         </div>
 
         {/* Auth Panel Sidebar */}

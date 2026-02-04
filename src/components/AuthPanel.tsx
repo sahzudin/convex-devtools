@@ -69,7 +69,7 @@ export function AuthPanel({ onClose }: AuthPanelProps) {
     : false;
 
   return (
-    <div className='w-96 border-l border-convex-border flex flex-col bg-convex-darker'>
+    <div className='auth-panel w-96 border-l border-convex-border flex flex-col bg-convex-darker'>
       {/* Header */}
       <div className='flex items-center justify-between p-4 border-b border-convex-border'>
         <h2 className='font-semibold flex items-center gap-2'>
